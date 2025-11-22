@@ -1,0 +1,40 @@
+# FastAPI and Web Framework
+fastapi==0.109.2
+uvicorn[standard]==0.27.1
+
+# Database
+sqlalchemy==2.0.27
+psycopg2-binary==2.9.9
+alembic==1.13.1
+
+# Pydantic and Settings
+pydantic==2.6.1
+pydantic-settings==2.1.0
+
+# Data Processing
+pandas==2.2.0
+python-dateutil==2.8.2
+
+# HTTP Requests
+requests==2.31.0
+
+# Upstox SDK (check PyPI for latest version)
+# Note: Install manually if not available on PyPI
+# upstox-python-sdk==latest
+
+# Web Scraping (for NSE)
+playwright==1.40.0
+
+# Environment Variables
+python-dotenv==1.0.0
+
+# Logging
+python-json-logger==2.0.7
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.26.0
+
+# Rate Limiting (for API calls)
+ratelimit==2.2.1

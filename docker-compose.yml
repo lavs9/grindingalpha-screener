@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  postgres:
+    container_name: screener_postgres
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - screener_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    container_name: screener_backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      UPSTOX_API_KEY: ${UPSTOX_API_KEY}
+      UPSTOX_API_SECRET: ${UPSTOX_API_SECRET}
+      UPSTOX_ACCESS_TOKEN: ${UPSTOX_ACCESS_TOKEN}
+      ENV: ${ENV}
+      LOG_LEVEL: ${LOG_LEVEL}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./logs/backend:/app/logs
+      - ./data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - screener_network
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  n8n:
+    container_name: screener_n8n
+    image: n8nio/n8n:latest
+    environment:
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      N8N_HOST: ${N8N_HOST:-localhost}
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      WEBHOOK_URL: http://localhost:5678/
+      GENERIC_TIMEZONE: Asia/Kolkata
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n/workflows:/home/node/.n8n/workflows
+    networks:
+      - screener_network
+    depends_on:
+      - backend
+
+networks:
+  screener_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  n8n_data:
