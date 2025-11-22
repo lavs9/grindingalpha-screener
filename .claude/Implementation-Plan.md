@@ -22,41 +22,139 @@ This document outlines the phased implementation plan for Phase 1 (Data Storage 
 
 ### Tasks
 
-#### 0.1 Project Structure Cleanup & Setup
-- [ ] Create proper project structure with clear separation
+#### 0.1 Project Structure Reorganization
+- [ ] Reorganize project structure with proper service separation
   ```
   /screener
   ├── .claude/                    # Planning docs (✓ Done)
-  ├── .env.example                # Environment template
-  ├── .env                        # Actual secrets (gitignored)
+  ├── .env.example                # Environment template (shared)
+  ├── .env                        # Actual secrets (gitignored, shared)
   ├── .gitignore                  # Comprehensive gitignore
-  ├── docker-compose.yml          # Multi-container setup
-  ├── README.md                   # Updated with setup instructions
-  ├── scripts/
-  │   ├── init.sql                # Database initialization
-  │   └── backup.sh               # Backup script
-  ├── n8n_workflows/              # Workflow templates (JSON exports)
-  ├── screener_project/
+  ├── docker-compose.yml          # Multi-container orchestration
+  ├── README.md                   # Project setup & overview
+  ├── CLAUDE.md                   # Claude Code guidance (✓ Done)
+  ├── CONTRIBUTING.md             # Contribution guidelines (✓ Done)
+  │
+  ├── backend/                    # FastAPI application
+  │   ├── Dockerfile              # Backend container definition
+  │   ├── requirements.txt        # Python dependencies
+  │   ├── alembic.ini             # Database migration config
+  │   ├── main.py                 # FastAPI application entry point
+  │   │
+  │   ├── alembic/                # Database migrations
+  │   │   ├── env.py
+  │   │   └── versions/           # Migration scripts
+  │   │
+  │   ├── app/                    # Application code
+  │   │   ├── __init__.py
+  │   │   │
+  │   │   ├── api/                # API route handlers
+  │   │   │   ├── __init__.py
+  │   │   │   ├── v1/
+  │   │   │   │   ├── __init__.py
+  │   │   │   │   ├── ingestion.py    # POST /api/v1/ingest/*
+  │   │   │   │   ├── query.py        # GET /api/v1/securities, /ohlcv
+  │   │   │   │   ├── screeners.py    # GET /api/v1/screeners/* (Phase 2)
+  │   │   │   │   └── health.py       # GET /health, /status
+  │   │   │   └── deps.py             # Common dependencies
+  │   │   │
+  │   │   ├── core/               # Core configuration
+  │   │   │   ├── __init__.py
+  │   │   │   ├── config.py       # Settings (from .env)
+  │   │   │   └── security.py     # Security utilities (future)
+  │   │   │
+  │   │   ├── database/           # Database layer
+  │   │   │   ├── __init__.py
+  │   │   │   ├── session.py      # DB session management
+  │   │   │   └── base.py         # Base model class
+  │   │   │
+  │   │   ├── models/             # SQLAlchemy models (all 11 tables)
+  │   │   │   ├── __init__.py
+  │   │   │   ├── security.py     # Securities, Indices tables
+  │   │   │   ├── timeseries.py   # OHLCV, MarketCap, Calculated
+  │   │   │   ├── events.py       # BulkDeals, BlockDeals, Surveillance
+  │   │   │   └── metadata.py     # Industry, Holidays, IndexConstituents, IngestionLogs
+  │   │   │
+  │   │   ├── schemas/            # Pydantic models (request/response)
+  │   │   │   ├── __init__.py
+  │   │   │   ├── ingestion.py    # Ingestion request/response schemas
+  │   │   │   ├── security.py     # Security schemas
+  │   │   │   └── ohlcv.py        # OHLCV schemas
+  │   │   │
+  │   │   ├── services/           # Business logic layer
+  │   │   │   ├── __init__.py
+  │   │   │   ├── nse/
+  │   │   │   │   ├── __init__.py
+  │   │   │   │   ├── securities_fetcher.py   # NSE securities list
+  │   │   │   │   ├── marketcap_fetcher.py    # NSE market cap
+  │   │   │   │   ├── deals_fetcher.py        # Bulk/block deals
+  │   │   │   │   ├── surveillance_fetcher.py # Surveillance list
+  │   │   │   │   └── industry_scraper.py     # Playwright-based scraper
+  │   │   │   ├── upstox/
+  │   │   │   │   ├── __init__.py
+  │   │   │   │   ├── client.py               # Upstox SDK wrapper
+  │   │   │   │   ├── historical.py           # Historical OHLCV
+  │   │   │   │   ├── daily_quotes.py         # Daily quotes
+  │   │   │   │   └── holidays.py             # Market holidays
+  │   │   │   └── calculators/                # Metric calculators (Phase 2)
+  │   │   │       ├── __init__.py
+  │   │   │       ├── relative_strength.py    # RS, VARS calculations
+  │   │   │       └── technical.py            # ATR, VCP, Stage analysis
+  │   │   │
+  │   │   └── utils/              # Utility functions
+  │   │       ├── __init__.py
+  │   │       ├── validators.py   # Data validation (ISIN, dates, OHLCV)
+  │   │       ├── date_utils.py   # Date parsing/formatting
+  │   │       ├── logger.py       # Structured logging
+  │   │       └── retry.py        # Retry logic with backoff
+  │   │
+  │   └── tests/                  # Test suite
+  │       ├── __init__.py
+  │       ├── conftest.py         # Pytest fixtures
+  │       ├── test_api/
+  │       ├── test_services/
+  │       ├── test_models/
+  │       └── test_utils/
+  │
+  ├── n8n/                        # n8n workflow orchestration
+  │   ├── Dockerfile              # Custom n8n image (if needed)
+  │   ├── workflows/              # Workflow JSON exports
+  │   │   ├── daily_eod_master.json           # Daily EOD workflow
+  │   │   ├── historical_backfill.json        # One-time backfill
+  │   │   ├── weekly_industry_scraper.json    # Weekly industry update
+  │   │   └── manual_triggers.json            # Manual data ingestion
+  │   └── README.md               # n8n setup instructions
+  │
+  ├── frontend/                   # React/Vue.js dashboard (Phase 3)
   │   ├── Dockerfile
-  │   ├── requirements.txt        # Updated dependencies
-  │   ├── main.py                 # FastAPI app
-  │   ├── database/
-  │   │   ├── db_helper.py        # Updated with env vars
-  │   │   └── models.py           # All SQLAlchemy models
-  │   ├── api/
-  │   │   ├── ingestion.py        # Ingestion endpoints
-  │   │   ├── query.py            # Query endpoints
-  │   │   └── health.py           # Health/monitoring endpoints
-  │   ├── services/
-  │   │   ├── upstox_client.py    # Upstox SDK wrapper
-  │   │   ├── nse_scraper.py      # NSE data fetching
-  │   │   └── validators.py       # Data validation logic
-  │   ├── utils/
-  │   │   ├── logger.py           # Structured logging
-  │   │   └── helpers.py          # Common utilities
-  │   └── tests/                  # Unit tests
-  └── logs/                       # Application logs
+  │   ├── package.json
+  │   ├── src/
+  │   └── public/
+  │
+  ├── scripts/                    # Database & deployment scripts
+  │   ├── init_db.sql             # Database initialization
+  │   ├── seed_data.sql           # Sample data for testing
+  │   ├── backup.sh               # Database backup script
+  │   └── restore.sh              # Database restore script
+  │
+  ├── logs/                       # Application logs (gitignored)
+  │   ├── backend/
+  │   └── n8n/
+  │
+  └── data/                       # Local data storage (gitignored)
+      ├── downloads/              # Downloaded NSE files
+      └── uploads/                # Manual upload staging
   ```
+
+- [ ] **Migration steps from current structure:**
+  1. Create new `backend/` directory
+  2. Move `screener_project/*` contents to `backend/app/`
+  3. Reorganize into proper module structure (api/, services/, models/, etc.)
+  4. Create `n8n/` directory with workflows subdirectory
+  5. Update import paths in all Python files
+  6. Update `docker-compose.yml` volume mounts to point to `backend/`
+  7. Move `screener_project/requirements.txt` to `backend/requirements.txt`
+  8. Archive old `screener_project/` folder (don't delete until migration verified)
 
 #### 0.2 Environment Configuration
 - [ ] Create `.env.example` with all required variables
@@ -84,25 +182,261 @@ This document outlines the phased implementation plan for Phase 1 (Data Storage 
 - [ ] Update `.gitignore` to exclude `.env`, `__pycache__`, `venv/`, `logs/`, etc.
 
 #### 0.3 Docker Setup
-- [ ] Create `docker-compose.yml` (as per Architecture.md)
-- [ ] Create `Dockerfile` for FastAPI application
-- [ ] Create `scripts/init.sql` for database initialization
+- [ ] **Create `docker-compose.yml`** (root directory)
+  ```yaml
+  version: '3.8'
+
+  services:
+    postgres:
+      container_name: screener_postgres
+      image: postgres:15-alpine
+      environment:
+        POSTGRES_USER: ${DB_USER}
+        POSTGRES_PASSWORD: ${DB_PASSWORD}
+        POSTGRES_DB: ${DB_NAME}
+      ports:
+        - "5432:5432"
+      volumes:
+        - postgres_data:/var/lib/postgresql/data
+        - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init.sql
+      networks:
+        - screener_network
+      healthcheck:
+        test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+        interval: 10s
+        timeout: 5s
+        retries: 5
+
+    backend:
+      container_name: screener_backend
+      build:
+        context: ./backend
+        dockerfile: Dockerfile
+      environment:
+        DB_HOST: postgres
+        DB_PORT: 5432
+        DB_NAME: ${DB_NAME}
+        DB_USER: ${DB_USER}
+        DB_PASSWORD: ${DB_PASSWORD}
+        UPSTOX_API_KEY: ${UPSTOX_API_KEY}
+        UPSTOX_API_SECRET: ${UPSTOX_API_SECRET}
+        UPSTOX_ACCESS_TOKEN: ${UPSTOX_ACCESS_TOKEN}
+        ENV: ${ENV}
+        LOG_LEVEL: ${LOG_LEVEL}
+      ports:
+        - "8000:8000"
+      volumes:
+        - ./backend:/app
+        - ./logs/backend:/app/logs
+        - ./data:/app/data
+      depends_on:
+        postgres:
+          condition: service_healthy
+      networks:
+        - screener_network
+      command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+    n8n:
+      container_name: screener_n8n
+      image: n8nio/n8n:latest
+      environment:
+        N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+        N8N_HOST: ${N8N_HOST:-localhost}
+        N8N_PORT: 5678
+        N8N_PROTOCOL: http
+        WEBHOOK_URL: http://localhost:5678/
+        GENERIC_TIMEZONE: Asia/Kolkata
+      ports:
+        - "5678:5678"
+      volumes:
+        - n8n_data:/home/node/.n8n
+        - ./n8n/workflows:/home/node/.n8n/workflows
+      networks:
+        - screener_network
+      depends_on:
+        - backend
+
+  networks:
+    screener_network:
+      driver: bridge
+
+  volumes:
+    postgres_data:
+    n8n_data:
+  ```
+
+- [ ] **Create `backend/Dockerfile`**
+  ```dockerfile
+  FROM python:3.12-slim
+
+  WORKDIR /app
+
+  # Install system dependencies
+  RUN apt-get update && apt-get install -y \
+      gcc \
+      postgresql-client \
+      && rm -rf /var/lib/apt/lists/*
+
+  # Install Playwright dependencies (for NSE scraping)
+  RUN apt-get update && apt-get install -y \
+      libnss3 \
+      libnspr4 \
+      libatk1.0-0 \
+      libatk-bridge2.0-0 \
+      libcups2 \
+      libdrm2 \
+      libxkbcommon0 \
+      libxcomposite1 \
+      libxdamage1 \
+      libxfixes3 \
+      libxrandr2 \
+      libgbm1 \
+      libasound2 \
+      && rm -rf /var/lib/apt/lists/*
+
+  # Copy requirements and install Python dependencies
+  COPY requirements.txt .
+  RUN pip install --no-cache-dir -r requirements.txt
+
+  # Install Playwright browsers
+  RUN playwright install chromium
+
+  # Copy application code
+  COPY . .
+
+  # Expose port
+  EXPOSE 8000
+
+  # Run migrations on startup (in production, run separately)
+  CMD ["sh", "-c", "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000"]
+  ```
+
+- [ ] **Create `scripts/init_db.sql`** (database initialization)
+  ```sql
+  -- Create extensions if needed
+  CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+  -- Grant privileges
+  GRANT ALL PRIVILEGES ON DATABASE screener_db TO screener_user;
+  ```
+
+- [ ] **Create `n8n/README.md`** (n8n setup instructions)
+  ```markdown
+  # n8n Workflow Setup
+
+  ## Initial Setup
+  1. Access n8n UI: http://localhost:5678
+  2. Create account (local n8n instance)
+  3. Import workflows from `workflows/` directory
+
+  ## Workflow Import
+  - Go to Workflows → Import from File
+  - Select JSON files from `n8n/workflows/`
+
+  ## Workflow Configuration
+  Each workflow requires:
+  - HTTP Request nodes pointing to: http://backend:8000/api/v1/ingest/*
+  - Cron triggers for scheduling
+  - Error handling configured (Continue On Fail: TRUE)
+
+  ## Testing Workflows
+  - Use "Execute Workflow" button for manual testing
+  - Check backend logs: `docker-compose logs -f backend`
+  - Query ingestion_logs table for results
+  ```
+
 - [ ] Test Docker build: `docker-compose build`
 - [ ] Test Docker startup: `docker-compose up -d`
 - [ ] Verify services:
   - PostgreSQL: `docker exec -it screener_postgres psql -U screener_user -d screener_db`
-  - FastAPI: `curl http://localhost:8000/health`
+  - Backend: `curl http://localhost:8000/health`
   - n8n: Open `http://localhost:5678` in browser
+- [ ] Check container logs: `docker-compose logs -f`
+- [ ] Verify network connectivity: Backend can reach PostgreSQL, n8n can reach Backend
 
-#### 0.4 Update Existing Code for Environment Variables
-- [ ] Update `database/db_helper.py`:
-  - Replace hardcoded credentials with `os.getenv()`
-  - Add connection pooling configuration
-  - Add health check function
-- [ ] Update `main.py`:
-  - Add CORS middleware
-  - Add structured logging
-  - Add startup event to initialize database
+#### 0.4 Backend Code Refactoring
+- [ ] **Create `backend/app/core/config.py`** (centralized configuration)
+  ```python
+  from pydantic_settings import BaseSettings
+
+  class Settings(BaseSettings):
+      # Database
+      DB_HOST: str
+      DB_PORT: int = 5432
+      DB_NAME: str
+      DB_USER: str
+      DB_PASSWORD: str
+
+      # Upstox
+      UPSTOX_API_KEY: str
+      UPSTOX_API_SECRET: str
+      UPSTOX_ACCESS_TOKEN: str
+
+      # Application
+      ENV: str = "development"
+      LOG_LEVEL: str = "INFO"
+
+      @property
+      def database_url(self) -> str:
+          return f"postgresql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+
+      class Config:
+          env_file = ".env"
+          case_sensitive = True
+
+  settings = Settings()
+  ```
+
+- [ ] **Migrate `database/db_helper.py` → `backend/app/database/session.py`**
+  - Replace hardcoded credentials with `settings.database_url`
+  - Add connection pooling: `pool_size=20, max_overflow=40`
+  - Add health check function: `check_db_connection()`
+
+- [ ] **Create `backend/main.py`** (application entry point)
+  ```python
+  from fastapi import FastAPI
+  from fastapi.middleware.cors import CORSMiddleware
+  from app.core.config import settings
+  from app.api.v1 import health, ingestion, query
+  from app.database.session import engine
+  from app.database.base import Base
+
+  app = FastAPI(
+      title="Stock Screener API",
+      version="1.0.0",
+      description="Indian Stock Market Screener Platform"
+  )
+
+  # CORS middleware
+  app.add_middleware(
+      CORSMiddleware,
+      allow_origins=["*"],  # Configure for production
+      allow_credentials=True,
+      allow_methods=["*"],
+      allow_headers=["*"],
+  )
+
+  # Include routers
+  app.include_router(health.router, prefix="/api/v1", tags=["health"])
+  app.include_router(ingestion.router, prefix="/api/v1/ingest", tags=["ingestion"])
+  app.include_router(query.router, prefix="/api/v1", tags=["query"])
+
+  @app.on_event("startup")
+  async def startup_event():
+      # Create tables (later replaced by Alembic migrations)
+      Base.metadata.create_all(bind=engine)
+
+  @app.get("/")
+  async def root():
+      return {"message": "Stock Screener API", "env": settings.ENV}
+  ```
+
+- [ ] **Migrate existing code to new structure:**
+  - `screener_project/database/` → `backend/app/database/`
+  - `screener_project/data_ingester/` → `backend/app/services/nse/`
+  - `screener_project/indexes_models/` → `backend/app/models/`
+  - `screener_project/return_calculator/` → `backend/app/services/calculators/`
+  - Update all import paths to use `app.` prefix
 
 #### 0.5 Dependency Management
 - [ ] Update `requirements.txt`:
