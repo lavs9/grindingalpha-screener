@@ -9,8 +9,8 @@ Holiday list : https://upstox.com/developer/api-documentation/get-market-holiday
 	1. Listed securities : https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv
 	2. Listed ETF : https://nsearchives.nseindia.com/content/equities/eq_etfseclist.csv
 	3. All Indices 
-		1. Get all NSE_INDEX from Upstox ( instrument type = INDEX) and store as Indexes separately
-		2. 
+		1. Get all NSE_INDEX from Upstox ( instrument type = INDEX) and store as Indexes separately OR
+		2. https://www.nseindia.com/api/allIndices?csv=true
 	4. Historical Download : Not required
 	5. Frequency : Daily EOD
 2. Market Cap of securities 

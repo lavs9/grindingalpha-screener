@@ -15,11 +15,12 @@ from app.core.config import settings
 from app.database.base import Base
 
 # Import all models here to ensure they're registered with Base.metadata
-# This will be populated in Phase 1.1 when models are created
-# from app.models.security import Security
-# from app.models.timeseries import OHLCVDaily, MarketCapHistory
-# from app.models.events import BulkDeal, BlockDeal, SurveillanceMeasure
-# from app.models.metadata import IndustryClassification, MarketHoliday, IndexConstituent, IngestionLog
+from app.models import (
+    Security, Index, SecurityType,
+    OHLCVDaily, MarketCapHistory, CalculatedMetrics,
+    BulkDeal, BlockDeal, SurveillanceMeasure,
+    IndustryClassification, MarketHoliday, IngestionLog
+)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
