@@ -43,6 +43,7 @@ services:
       - ./backend:/app
       - ./logs/backend:/app/logs
       - ./data:/app/data
+      - ./.claude/samples:/app/.claude/samples
     depends_on:
       postgres:
         condition: service_healthy

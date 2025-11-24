@@ -149,6 +149,9 @@ def parse_equity_list(csv_content: str) -> Dict:
         csv_file = StringIO(csv_content)
         reader = csv.DictReader(csv_file)
 
+        # Strip spaces from column names to handle CSV formatting variations
+        reader.fieldnames = [name.strip() if name else name for name in reader.fieldnames]
+
         for row_num, row in enumerate(reader, start=2):  # Start at 2 (header is row 1)
             result["stats"]["total_rows"] += 1
 
@@ -157,7 +160,7 @@ def parse_equity_list(csv_content: str) -> Dict:
                 symbol = row.get('SYMBOL', '').strip()
                 isin = row.get('ISIN NUMBER', '').strip()
                 security_name = row.get('NAME OF COMPANY', '').strip()
-                series = row.get(' SERIES', '').strip()  # Note: may have leading space
+                series = row.get('SERIES', '').strip()
 
                 # Validation
                 if not symbol:
@@ -187,9 +190,9 @@ def parse_equity_list(csv_content: str) -> Dict:
 
                 # Parse optional fields
                 listing_date = parse_date(row.get('DATE OF LISTING', ''), '%d-%b-%Y')
-                paid_up_value = parse_decimal(row.get(' PAID UP VALUE', ''))
-                market_lot_str = row.get(' MARKET LOT', '').strip()
-                face_value = parse_decimal(row.get(' FACE VALUE', ''))
+                paid_up_value = parse_decimal(row.get('PAID UP VALUE', ''))
+                market_lot_str = row.get('MARKET LOT', '').strip()
+                face_value = parse_decimal(row.get('FACE VALUE', ''))
 
                 # Market lot is required and must be positive integer
                 market_lot = None
@@ -274,6 +277,9 @@ def parse_etf_list(csv_content: str) -> Dict:
         # Parse CSV
         csv_file = StringIO(csv_content)
         reader = csv.DictReader(csv_file)
+
+        # Strip spaces from column names to handle CSV formatting variations
+        reader.fieldnames = [name.strip() if name else name for name in reader.fieldnames]
 
         for row_num, row in enumerate(reader, start=2):  # Start at 2 (header is row 1)
             result["stats"]["total_rows"] += 1
