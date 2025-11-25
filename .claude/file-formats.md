@@ -92,18 +92,17 @@
 | Column Name | Data Type | Required | Description | Example Value |
 |------------|-----------|----------|-------------|---------------|
 | SYMBOL | String(50) | Yes | ETF trading symbol | GOLDBEES |
-| NAME OF COMPANY | String(255) | Yes | ETF name | Nippon India ETF Gold BeES |
-| SERIES | String(10) | Yes | Usually "EQ" for ETFs | EQ |
-| DATE OF LISTING | Date | Yes | Listing date (DD-MMM-YYYY) | 15-MAR-2007 |
-| PAID UP VALUE | Decimal(15,2) | No | Total paid-up value | 500000000.00 |
-| MARKET LOT | Integer | Yes | Lot size | 1 |
-| ISIN NUMBER | String(12) | Yes | ISIN code | INF204KA1Q27 |
-| FACE VALUE | Decimal(10,2) | Yes | Face value per unit | 10.00 |
+| Underlying | String(255) | Yes | ETF name | Nifty50 |
+| SecurityName | String(30) | Yes |  | NIPINDETFNIFTYBEES |
+| DateofListing | Date | Yes | Listing date (DD-MMM-YY) | 08-Jan-02 |
+| MarketLot | Integer | Yes | Lot size | 1 |
+| ISINNumber | String(12) | Yes | ISIN code | INF204KA1Q27 |
+| FaceValue | Decimal(10,2) | Yes | Face value per unit | 10.00 |
 
 **Validation Rules:** Same as EQUITY_L.csv
 
 **Parsing Notes:**
-- ETF ISINs may start with "INF" (funds) instead of "INE" (equities)
+- ETF ISINs may start with "INF" (funds) instead of "IN" (equities), just store ISIN
 - Otherwise identical format to EQUITY_L.csv
 
 **Last Verified:** 2025-01-16
@@ -154,7 +153,7 @@
 
 **Validation Rules:**
 - Trade Date: Must match the date in file name
-- Symbol: Must exist in `securities` table (filter out unlisted symbols)
+- Symbol: Must exist in `securities` table (warn if not, but still store)
 - Market Cap: Must be > 0
 - Issue Size: Must be > 0
 
@@ -208,8 +207,8 @@
 | Symbol | String(50) | Yes | Security symbol | RELIANCE |
 | Security Name | String(255) | Yes | Company name | Reliance Industries Limited |
 | Client Name | String(255) | Yes | Name of entity executing deal | XYZ MUTUAL FUND |
-| Deal Type | String(10) | Yes | BUY or SELL | BUY |
-| Quantity | BigInt | Yes | Number of shares | 5000000 |
+| Buy/Sell | String(10) | Yes | BUY or SELL | BUY |
+| Quantity Traded | BigInt | Yes | Number of shares | 5000000 |
 | Trade Price/Wght. Avg. Price | Decimal(15,2) | Yes | Average price per share | 1285.50 |
 | Remarks | Text | No | Additional notes (if any) | - |
 
@@ -218,6 +217,7 @@
 - Deal Type: Must be exactly "BUY" or "SELL"
 - Quantity: Must be > 0
 - Trade Price: Must be > 0
+- If empty file, record will be of format ```NO RECORDS,,,,,,```, ignore and send message as no records found
 
 **Parsing Notes:**
 - Client Name may contain commas (e.g., "MUTUAL FUND, LIMITED") → Handle quoted CSV
