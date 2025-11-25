@@ -11,6 +11,7 @@ from typing import Optional
 from app.database.session import get_db
 from app.services.nse.securities_service import ingest_securities_from_nse
 from app.services.nse.market_cap_service import ingest_market_cap_from_nse
+from app.services.nse.deals_service import ingest_deals_from_nse
 from datetime import date
 
 router = APIRouter()
@@ -232,6 +233,164 @@ async def ingest_market_cap(
         "success": True,
         "source": result.get("source", ""),
         "trade_date": result.get("trade_date"),
+        "parse_stats": result.get("parse_stats", {}),
+        "ingestion_result": result.get("ingestion_result", {}),
+        "errors": result.get("total_errors", [])
+    }
+
+
+@router.post("/bulk-deals")
+async def ingest_bulk_deals(
+    file_path: Optional[str] = Query(None, description="Optional local CSV file path for testing"),
+    db: Session = Depends(get_db)
+):
+    """
+    Ingest NSE bulk deals data.
+
+    This endpoint fetches bulk deals data from NSE archives, parses the CSV,
+    validates the data, and inserts records into the bulk_deals table.
+
+    **Source:** https://nsearchives.nseindia.com/content/equities/bulk.csv
+
+    **Process:**
+    1. Fetch CSV from NSE or read from local file (if file_path provided)
+    2. Parse and validate each bulk deal record
+    3. Skip symbols that don't exist in securities table (optional)
+    4. Insert records (no upsert - each deal is a unique event)
+    5. Return statistics and any errors encountered
+
+    **Query Parameters:**
+    - file_path: Optional local CSV file path (for testing with sample files)
+
+    **Returns:**
+    - success: Whether the ingestion completed successfully
+    - source: URL or file path that was processed
+    - deal_date: The date from the CSV file
+    - parse_stats: Statistics from CSV parsing (total_rows, parsed_successfully, failed)
+    - ingestion_result: Database insertion results (records_inserted, records_skipped)
+    - total_errors: List of all errors encountered
+
+    **Example Usage:**
+    ```bash
+    # Fetch from NSE (production)
+    curl -X POST http://localhost:8000/api/v1/ingest/bulk-deals
+
+    # Test with sample CSV file
+    curl -X POST "http://localhost:8000/api/v1/ingest/bulk-deals?file_path=/app/.claude/samples/bulk_sample.csv"
+    ```
+    """
+    try:
+        result = ingest_deals_from_nse(
+            db=db,
+            deal_type="BULK",
+            file_path=file_path,
+            skip_missing_symbols=False
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": f"Unexpected error during bulk deals ingestion: {str(e)}",
+                "error_type": type(e).__name__
+            }
+        )
+
+    if not result.get("success", False):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Bulk deals ingestion failed",
+                "errors": result.get("total_errors", result.get("fetch_errors", [])),
+                "deal_date": result.get("deal_date"),
+                "parse_stats": result.get("parse_stats", {}),
+                "ingestion_result": result.get("ingestion_result")
+            }
+        )
+
+    return {
+        "message": "Bulk deals ingestion completed",
+        "success": True,
+        "source": result.get("source", ""),
+        "deal_date": result.get("deal_date"),
+        "parse_stats": result.get("parse_stats", {}),
+        "ingestion_result": result.get("ingestion_result", {}),
+        "errors": result.get("total_errors", [])
+    }
+
+
+@router.post("/block-deals")
+async def ingest_block_deals(
+    file_path: Optional[str] = Query(None, description="Optional local CSV file path for testing"),
+    db: Session = Depends(get_db)
+):
+    """
+    Ingest NSE block deals data.
+
+    This endpoint fetches block deals data from NSE archives, parses the CSV,
+    validates the data, and inserts records into the block_deals table.
+
+    **Source:** https://nsearchives.nseindia.com/content/equities/block.csv
+
+    **Process:**
+    1. Fetch CSV from NSE or read from local file (if file_path provided)
+    2. Parse and validate each block deal record
+    3. Skip symbols that don't exist in securities table (optional)
+    4. Insert records (no upsert - each deal is a unique event)
+    5. Return statistics and any errors encountered
+
+    **Query Parameters:**
+    - file_path: Optional local CSV file path (for testing with sample files)
+
+    **Returns:**
+    - success: Whether the ingestion completed successfully
+    - source: URL or file path that was processed
+    - deal_date: The date from the CSV file
+    - parse_stats: Statistics from CSV parsing (total_rows, parsed_successfully, failed)
+    - ingestion_result: Database insertion results (records_inserted, records_skipped)
+    - total_errors: List of all errors encountered
+
+    **Example Usage:**
+    ```bash
+    # Fetch from NSE (production)
+    curl -X POST http://localhost:8000/api/v1/ingest/block-deals
+
+    # Test with sample CSV file
+    curl -X POST "http://localhost:8000/api/v1/ingest/block-deals?file_path=/app/.claude/samples/block_sample.csv"
+    ```
+    """
+    try:
+        result = ingest_deals_from_nse(
+            db=db,
+            deal_type="BLOCK",
+            file_path=file_path,
+            skip_missing_symbols=False
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": f"Unexpected error during block deals ingestion: {str(e)}",
+                "error_type": type(e).__name__
+            }
+        )
+
+    if not result.get("success", False):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Block deals ingestion failed",
+                "errors": result.get("total_errors", result.get("fetch_errors", [])),
+                "deal_date": result.get("deal_date"),
+                "parse_stats": result.get("parse_stats", {}),
+                "ingestion_result": result.get("ingestion_result")
+            }
+        )
+
+    return {
+        "message": "Block deals ingestion completed",
+        "success": True,
+        "source": result.get("source", ""),
+        "deal_date": result.get("deal_date"),
         "parse_stats": result.get("parse_stats", {}),
         "ingestion_result": result.get("ingestion_result", {}),
         "errors": result.get("total_errors", [])
