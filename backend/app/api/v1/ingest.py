@@ -10,6 +10,8 @@ from typing import Optional
 
 from app.database.session import get_db
 from app.services.nse.securities_service import ingest_securities_from_nse
+from app.services.nse.market_cap_service import ingest_market_cap_from_nse
+from datetime import date
 
 router = APIRouter()
 
@@ -133,5 +135,104 @@ async def ingest_etf(
         "source": result["source"],
         "parse_stats": result["parse_stats"],
         "ingestion_result": result["ingestion_result"],
+        "errors": result.get("total_errors", [])
+    }
+
+
+@router.post("/market-cap")
+async def ingest_market_cap(
+    target_date: Optional[str] = Query(None, description="Date to fetch market cap for (YYYY-MM-DD format)"),
+    file_path: Optional[str] = Query(None, description="Optional local ZIP file path for testing"),
+    db: Session = Depends(get_db)
+):
+    """
+    Ingest NSE market cap data from PR{DDMMYY}.zip archives.
+
+    This endpoint fetches market cap data from NSE archives for a specific date,
+    extracts the MCAP{DDMMYYYY}.csv file from the ZIP archive, parses the data,
+    and inserts/updates records in the market_cap_history table.
+
+    **Source:** https://nsearchives.nseindia.com/archives/equities/bhavcopy/pr/PR{DDMMYY}.zip
+
+    **Process:**
+    1. Download ZIP archive from NSE or read from local file (if file_path provided)
+    2. Extract MCAP{DDMMYYYY}.csv from ZIP (handles subdirectories)
+    3. Parse and validate each market cap record
+    4. Skip symbols that don't exist in securities table (configurable)
+    5. Insert new records or update existing ones (upsert on symbol+date)
+    6. Return statistics and any errors encountered
+
+    **Query Parameters:**
+    - target_date: Date to fetch data for (YYYY-MM-DD format). Defaults to today.
+    - file_path: Optional local ZIP file path (for testing with sample files)
+
+    **Returns:**
+    - success: Whether the ingestion completed successfully
+    - source: URL or file path that was processed
+    - trade_date: Actual trade date from the CSV file
+    - parse_stats: Statistics from CSV parsing (total_rows, parsed_successfully, failed)
+    - ingestion_result: Database insertion results (records_inserted, records_skipped)
+    - total_errors: List of all errors encountered
+
+    **Example Usage:**
+    ```bash
+    # Fetch from NSE for today
+    curl -X POST http://localhost:8000/api/v1/ingest/market-cap
+
+    # Fetch from NSE for specific date
+    curl -X POST "http://localhost:8000/api/v1/ingest/market-cap?target_date=2025-01-16"
+
+    # Test with sample ZIP file
+    curl -X POST "http://localhost:8000/api/v1/ingest/market-cap?file_path=/app/.claude/samples/PR160125_sample.zip"
+    ```
+    """
+    # Parse target_date or use today
+    if target_date:
+        try:
+            parsed_date = date.fromisoformat(target_date)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail={"message": f"Invalid date format: {target_date}. Use YYYY-MM-DD format."}
+            )
+    else:
+        parsed_date = date.today()
+
+    # Ingest market cap data
+    try:
+        result = ingest_market_cap_from_nse(
+            db=db,
+            target_date=parsed_date,
+            file_path=file_path,
+            skip_missing_symbols=True
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": f"Unexpected error during market cap ingestion: {str(e)}",
+                "error_type": type(e).__name__
+            }
+        )
+
+    if not result.get("success", False):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Market cap ingestion failed",
+                "errors": result.get("total_errors", result.get("fetch_errors", [])),
+                "trade_date": result.get("trade_date"),
+                "parse_stats": result.get("parse_stats", {}),
+                "ingestion_result": result.get("ingestion_result")
+            }
+        )
+
+    return {
+        "message": "Market cap ingestion completed",
+        "success": True,
+        "source": result.get("source", ""),
+        "trade_date": result.get("trade_date"),
+        "parse_stats": result.get("parse_stats", {}),
+        "ingestion_result": result.get("ingestion_result", {}),
         "errors": result.get("total_errors", [])
     }
