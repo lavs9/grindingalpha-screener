@@ -12,6 +12,7 @@ from app.database.session import get_db
 from app.services.nse.securities_service import ingest_securities_from_nse
 from app.services.nse.market_cap_service import ingest_market_cap_from_nse
 from app.services.nse.deals_service import ingest_deals_from_nse
+from app.services.nse.surveillance_service import fetch_surveillance_data, ingest_surveillance
 from datetime import date
 
 router = APIRouter()
@@ -394,4 +395,136 @@ async def ingest_block_deals(
         "parse_stats": result.get("parse_stats", {}),
         "ingestion_result": result.get("ingestion_result", {}),
         "errors": result.get("total_errors", [])
+    }
+
+
+@router.post("/surveillance")
+async def ingest_surveillance_data(
+    filename: Optional[str] = Query(None, description="NSE filename (e.g., 'REG1_IND160125.csv')"),
+    ingestion_date: Optional[str] = Query(None, description="Date override (YYYY-MM-DD format)"),
+    file_path: Optional[str] = Query(None, description="Optional local file path for testing"),
+    db: Session = Depends(get_db)
+):
+    """
+    Ingest NSE Surveillance Measures data (REG1_IND format).
+
+    This endpoint fetches surveillance data from NSE archives, parses the 63-column CSV,
+    and stores it across 4 normalized database tables for efficient querying.
+
+    **Source:** https://nsearchives.nseindia.com/surveillance/REG1_IND{DDMMYY}.csv
+
+    **Data Structure:**
+    - 63 total columns with surveillance measures and risk indicators
+    - Stored in 4 normalized tables:
+        1. surveillance_list (16 columns) - Core staged measures + binary flags
+        2. surveillance_fundamental_flags (10 columns) - Financial/compliance risks
+        3. surveillance_price_movement (11 columns) - Close-to-close price movements
+        4. surveillance_price_variation (7 columns) - High-low volatility indicators
+
+    **Surveillance Measures:**
+    - **Staged Measures:** GSM (0-6), Long/Short Term ASM (1-4, 1-2), ESM (1-2),
+                          IRP (0-2), Default (0-1), ICA (0-1), SMS (0-1)
+    - **Binary Flags:** High promoter pledge, Add-on price band, Total pledge, Social media
+    - **Financial Flags:** Loss-making, High encumbrance (>50%), Zero EPS, BZ/SZ series, etc.
+    - **Price Momentum:** 11 close-to-close thresholds (25%-200% over 5d-365d)
+    - **Volatility:** 7 high-low variation thresholds (75%-300% over 1m-12m)
+
+    **Process:**
+    1. Fetch CSV from NSE or read from local file (if file_path provided)
+    2. Parse all 63 columns and split into 4 tables (18 filler columns ignored)
+    3. Convert NSE encoding: "100" → NULL, "0"/"1"/"2" → stage level/flagged
+    4. Validate data consistency across all 4 tables
+    5. UPSERT records (replace existing data for same date)
+    6. Return statistics per table and any errors
+
+    **Query Parameters:**
+    - filename: NSE filename (e.g., "REG1_IND160125.csv") - date extracted from filename
+    - ingestion_date: Optional date override (YYYY-MM-DD format) - overrides filename date
+    - file_path: Optional local file path (for testing with sample files)
+
+    **Returns:**
+    - success: Whether the ingestion completed successfully
+    - ingestion_date: Date of the surveillance snapshot
+    - source: URL or file path that was processed
+    - parse_stats: Statistics from CSV parsing (total_rows, parsed_rows, error_rows)
+    - records_inserted: Per-table insertion counts
+    - errors: List of all errors encountered
+
+    **Example Usage:**
+    ```bash
+    # Fetch from NSE (production) with filename
+    curl -X POST "http://localhost:8000/api/v1/ingest/surveillance?filename=REG1_IND160125.csv"
+
+    # With explicit date override
+    curl -X POST "http://localhost:8000/api/v1/ingest/surveillance?filename=REG1_IND160125.csv&ingestion_date=2025-01-16"
+
+    # Test with local sample file
+    curl -X POST "http://localhost:8000/api/v1/ingest/surveillance?file_path=.claude/samples/REG1_IND160125.csv"
+    ```
+
+    **References:**
+    - Specification: .claude/file-formats-surveillance.md
+    - NSE Circular: NSE/SURV/65097 dated November 14, 2024
+    - Database Models: app/models/surveillance.py
+    """
+    # Convert date string to date object if provided
+    date_override = None
+    if ingestion_date:
+        try:
+            date_override = date.fromisoformat(ingestion_date)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail={"message": f"Invalid date format: {ingestion_date}. Use YYYY-MM-DD."}
+            )
+
+    # Fetch and parse surveillance data
+    fetch_result = fetch_surveillance_data(
+        filename=filename,
+        ingestion_date=date_override,
+        file_path=file_path
+    )
+
+    if not fetch_result["success"]:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Surveillance data fetch/parse failed",
+                "errors": fetch_result.get("errors", []),
+                "parse_stats": fetch_result.get("stats", {}),
+                "source": fetch_result.get("source", "")
+            }
+        )
+
+    # Ingest into database
+    ingest_result = ingest_surveillance(
+        db=db,
+        surveillance_data=fetch_result["data"],
+        skip_missing_symbols=True
+    )
+
+    if not ingest_result["success"]:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "Surveillance data ingestion failed",
+                "errors": ingest_result.get("errors", []),
+                "parse_stats": fetch_result.get("stats", {}),
+                "records_inserted": ingest_result.get("records_inserted", {})
+            }
+        )
+
+    # Calculate total records inserted across all tables
+    total_inserted = sum(ingest_result["records_inserted"].values())
+
+    return {
+        "message": f"Surveillance data ingestion completed for {fetch_result['ingestion_date']}",
+        "success": True,
+        "ingestion_date": fetch_result["ingestion_date"],
+        "source": fetch_result.get("source", ""),
+        "parse_stats": fetch_result.get("stats", {}),
+        "records_inserted": ingest_result.get("records_inserted", {}),
+        "records_updated": ingest_result.get("records_updated", {}),
+        "total_records": total_inserted,
+        "errors": fetch_result.get("errors", []) + ingest_result.get("errors", [])
     }

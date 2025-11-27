@@ -18,6 +18,23 @@ from app.schemas.ohlcv import (
     OHLCVResponse,
     OHLCVBulkCreate,
 )
+from app.schemas.surveillance import (
+    SurveillanceListBase,
+    SurveillanceListCreate,
+    SurveillanceListResponse,
+    SurveillanceFundamentalFlagsBase,
+    SurveillanceFundamentalFlagsCreate,
+    SurveillanceFundamentalFlagsResponse,
+    SurveillancePriceMovementBase,
+    SurveillancePriceMovementCreate,
+    SurveillancePriceMovementResponse,
+    SurveillancePriceVariationBase,
+    SurveillancePriceVariationCreate,
+    SurveillancePriceVariationResponse,
+    SurveillanceAggregatedResponse,
+    SurveillanceIngestionRequest,
+    SurveillanceIngestionResponse,
+)
 
 __all__ = [
     # Security schemas
@@ -36,4 +53,21 @@ __all__ = [
     'OHLCVCreate',
     'OHLCVResponse',
     'OHLCVBulkCreate',
+
+    # Surveillance schemas
+    'SurveillanceListBase',
+    'SurveillanceListCreate',
+    'SurveillanceListResponse',
+    'SurveillanceFundamentalFlagsBase',
+    'SurveillanceFundamentalFlagsCreate',
+    'SurveillanceFundamentalFlagsResponse',
+    'SurveillancePriceMovementBase',
+    'SurveillancePriceMovementCreate',
+    'SurveillancePriceMovementResponse',
+    'SurveillancePriceVariationBase',
+    'SurveillancePriceVariationCreate',
+    'SurveillancePriceVariationResponse',
+    'SurveillanceAggregatedResponse',
+    'SurveillanceIngestionRequest',
+    'SurveillanceIngestionResponse',
 ]

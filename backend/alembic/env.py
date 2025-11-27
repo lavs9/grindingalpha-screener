@@ -18,7 +18,9 @@ from app.database.base import Base
 from app.models import (
     Security, Index, SecurityType,
     OHLCVDaily, MarketCapHistory, CalculatedMetrics,
-    BulkDeal, BlockDeal, SurveillanceMeasure,
+    BulkDeal, BlockDeal,
+    SurveillanceList, SurveillanceFundamentalFlags,
+    SurveillancePriceMovement, SurveillancePriceVariation,
     IndustryClassification, MarketHoliday, IngestionLog
 )
 

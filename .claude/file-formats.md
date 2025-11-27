@@ -258,53 +258,79 @@
 
 ## 4. NSE Surveillance Measures
 
-### 4.1 Surveillance Actions (REG1_IND{DDMMYY}.csv)
+### 4.1 Surveillance Data (REG1_IND{DDMMYY}.csv)
 
-**Source URL Pattern:** `https://nsearchives.nseindia.com/content/cm/REG1_IND{DDMMYY}.csv`
+**⚠️ IMPORTANT: See [file-formats-surveillance.md](file-formats-surveillance.md) for complete 63-column specification**
+
+**Source URL Pattern:** `https://nsearchives.nseindia.com/surveillance/REG1_IND{DDMMYY}.csv`
 
 **Date Format in URL:** DDMMYY (2-digit day, month, year)
 
-**Example URL:** https://nsearchives.nseindia.com/content/cm/REG1_IND160125.csv (for 16-Jan-2025)
+**Example URL:** https://nsearchives.nseindia.com/surveillance/REG1_IND160125.csv (for 16-Jan-2025)
 
-**Sample File Location:** `.claude/samples/REG1_IND160125_sample.csv`
+**Sample File Location:** `.claude/samples/REG1_IND160125.csv`
+
+**Documentation PDF:** `.claude/samples/2818.pdf` (NSE Circular NSE/SURV/65097)
 
 **Format:** CSV (comma-separated), UTF-8 encoding
 
 **Header Row:** YES
 
-**Update Frequency:** Daily
+**Update Frequency:** Daily (T+0, published after market close)
 
-**Columns:**
+**Total Columns:** 63 columns across 4 categories:
+1. **Basic Metadata** (5 columns): Symbol, Status, Series, NSE Exclusive listing
+2. **Staged Surveillance Measures** (8 columns): GSM, ASM (Long/Short Term), ESM, IRP, Default, ICA, SMS
+3. **Fundamental Risk Flags** (10 columns): Loss-making, high pledge, compliance issues, valuation metrics
+4. **Price Movement/Volatility** (18 columns): Close-to-close movements, high-low variations
+5. **Reserved Fillers** (18 columns): For future NSE measures
 
-| Column Name | Data Type | Required | Description | Example Value |
-|------------|-----------|----------|-------------|---------------|
-| Symbol | String(50) | Yes | Security symbol | XYZ |
-| Security Name | String(255) | Yes | Company name | XYZ Limited |
-| Surveillance Action | String(50) | Yes | Type of action (ASM, GSM, etc.) | ASM |
-| Date | Date | Yes | Action effective date | 16-JAN-2025 |
-| Reason | Text | No | Reason for surveillance | Price volatility |
+**Key Surveillance Measures:**
+- **GSM** (Graded Surveillance Measure): Stages 0-6 for unusual price/volume patterns
+- **ASM** (Additional Surveillance Measure): Long-term (Stages 1-4) and Short-term (Stages 1-2)
+- **ESM** (Enhanced Surveillance Measure): Stages I-II (most common indicator in sample data)
+- **IRP** (Insolvency Resolution Process): IBC proceedings (Stages 0-2)
+- **Binary Flags**: High promoter pledge, add-on price band, total pledge, social media surveillance
 
-**Surveillance Action Codes:**
-- **ASM** (Additional Surveillance Measure): Price/volume abnormalities
-- **GSM** (Graded Surveillance Measure): More severe restrictions
-- Others: To be documented as encountered
+**Database Design:** 4 normalized tables
+1. `surveillance_list` - Core staged measures + binary flags (16 columns)
+2. `surveillance_fundamental_flags` - Financial/compliance risks (10 columns)
+3. `surveillance_price_movement` - Close-to-close indicators (11 columns)
+4. `surveillance_price_variation` - High-low volatility (7 columns)
+
+**Encoding Pattern:**
+- `100` = Not applicable / Not under this measure
+- `0`, `1`, `2`, etc. = Active surveillance stage or flagged condition
+- For binary flags: `100` = false, `0` = true (flagged)
 
 **Validation Rules:**
-- Symbol: Should exist in `securities` table
-- Surveillance Action: Non-empty string
+- Symbol: Should exist in `securities` table (loose coupling, no FK constraint)
+- Status: Must be A (Active), S (Suspended), or I (Inactive)
+- Stage values: Range checks per measure (e.g., GSM: 0-6, ESM: 1-2)
 
 **Business Logic:**
-- Securities under surveillance are **EXCLUDED** from all screeners
-- Store is_active flag (toggle when surveillance lifted)
+- Daily historical tracking (PRIMARY KEY: symbol + date)
+- Supports tracking entry/exit from surveillance measures
+- Multiple measures can apply simultaneously to a single stock
+- "Top Three Criteria" logic applies to price movement flags (NSE/SURV/64402)
 
 **Parsing Notes:**
-- Some securities may have multiple surveillance actions simultaneously
-- Action may be lifted in later CSV (not present = lifted)
+- 45 columns stored, 18 filler columns ignored (reserved for future use)
+- Complete CSV parser code and field metadata available in surveillance documentation
+- Python constants class provided for UI integration (labels, descriptions, severity levels)
 
-**Last Verified:** 2025-01-16
+**UI Integration:**
+- Field metadata includes: label, description, severity (critical/high/medium/low), category
+- Usage examples: API responses, tooltips, dynamic form generation
+- See `SurveillanceFieldMetadata` class in surveillance documentation
+
+**Last Verified:** 2025-01-26
 
 **Change Log:**
-- 2025-01-16: Initial documentation
+- 2025-01-26: Complete 63-column specification documented in separate file
+- 2025-01-16: Initial basic documentation
+
+**📖 Full Documentation:** [.claude/file-formats-surveillance.md](.claude/file-formats-surveillance.md)
 
 ---
 
