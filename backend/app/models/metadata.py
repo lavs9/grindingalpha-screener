@@ -1,9 +1,9 @@
 """
-Metadata models: Industry Classification, Market Holidays, and Ingestion Logs.
+Metadata models: Industry Classification, Index Constituents, Market Holidays, and Ingestion Logs.
 
 NOTE: These models support core platform operations and data tracking.
 """
-from sqlalchemy import Column, Integer, BigInteger, String, Date, DateTime, ForeignKey, JSON
+from sqlalchemy import Column, Integer, BigInteger, String, Date, DateTime, ForeignKey, JSON, Index, Numeric
 from sqlalchemy.sql import func
 from app.database.base import Base
 
@@ -35,6 +35,59 @@ class IndustryClassification(Base):
 
     def __repr__(self):
         return f"<IndustryClassification(symbol='{self.symbol}', sector='{self.sector}', industry='{self.industry}')>"
+
+
+class IndexConstituent(Base):
+    """
+    Tracks which securities belong to which indices over time.
+
+    Data Source: NSE Quote Equity API (metadata.pdSectorIndAll)
+    Endpoint: https://www.nseindia.com/api/quote-equity?symbol={symbol}
+
+    Schema Status: ACTIVE - Automated from NSE Quote API
+
+    Note: Weightage is NULL until source is identified.
+    Historical tracking via effective_from/effective_to dates allows
+    backtesting and analysis of index composition changes.
+
+    Example Queries:
+    - Which stocks are currently in NIFTY 50? → WHERE index_id=X AND effective_to IS NULL
+    - Which stocks were in NIFTY 50 on 2024-01-01? → WHERE index_id=X AND effective_from <= '2024-01-01' AND (effective_to IS NULL OR effective_to >= '2024-01-01')
+    - When did RELIANCE exit NIFTY ENERGY? → WHERE symbol='RELIANCE' AND index_id=Y AND effective_to IS NOT NULL
+    """
+    __tablename__ = 'index_constituents'
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    index_id = Column(Integer, ForeignKey('indices.id', ondelete='CASCADE'),
+                     nullable=False, index=True,
+                     comment="Foreign key to indices table")
+    symbol = Column(String(50), ForeignKey('securities.symbol', ondelete='CASCADE'),
+                   nullable=False, index=True,
+                   comment="Security symbol (foreign key to securities table)")
+    effective_from = Column(Date, nullable=False, index=True,
+                           comment="Date this constituent relationship became effective (first seen in pdSectorIndAll)")
+    effective_to = Column(Date, nullable=True, index=True,
+                         comment="Date this constituent relationship ended (NULL = current, removed from pdSectorIndAll)")
+    weightage = Column(Numeric(6, 4), nullable=True,
+                      comment="Index weightage in percentage (NULL - not available in NSE Quote API)")
+    created_at = Column(DateTime, server_default=func.now(),
+                       comment="Record creation timestamp")
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(),
+                       comment="Record last update timestamp")
+
+    # Composite indexes for common queries
+    __table_args__ = (
+        # Partial index for active constituents (most common query)
+        Index('idx_index_constituents_active', 'index_id', 'symbol',
+              postgresql_where=(effective_to == None)),
+        # Index for date range queries (backtesting)
+        Index('idx_index_constituents_dates', 'index_id', 'effective_from', 'effective_to'),
+        # Index for symbol-based queries
+        Index('idx_index_constituents_symbol_date', 'symbol', 'effective_from'),
+    )
+
+    def __repr__(self):
+        return f"<IndexConstituent(index_id={self.index_id}, symbol='{self.symbol}', from='{self.effective_from}', to='{self.effective_to}')>"
 
 
 class MarketHoliday(Base):

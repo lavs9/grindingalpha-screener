@@ -35,6 +35,18 @@ from app.schemas.surveillance import (
     SurveillanceIngestionRequest,
     SurveillanceIngestionResponse,
 )
+from app.schemas.industry import (
+    IndustryClassificationBase,
+    IndustryClassificationCreate,
+    IndustryClassificationResponse,
+    IndexConstituentBase,
+    IndexConstituentCreate,
+    IndexConstituentResponse,
+    IndustryIngestionRequest,
+    IndustryIngestionResponse,
+    IndexConstituentListResponse,
+    IndustryStatsResponse,
+)
 
 __all__ = [
     # Security schemas
@@ -70,4 +82,16 @@ __all__ = [
     'SurveillanceAggregatedResponse',
     'SurveillanceIngestionRequest',
     'SurveillanceIngestionResponse',
+
+    # Industry classification schemas
+    'IndustryClassificationBase',
+    'IndustryClassificationCreate',
+    'IndustryClassificationResponse',
+    'IndexConstituentBase',
+    'IndexConstituentCreate',
+    'IndexConstituentResponse',
+    'IndustryIngestionRequest',
+    'IndustryIngestionResponse',
+    'IndexConstituentListResponse',
+    'IndustryStatsResponse',
 ]

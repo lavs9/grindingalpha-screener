@@ -4,8 +4,8 @@ SQLAlchemy models for all database tables.
 Import all models here to ensure they're registered with Base.metadata
 before Alembic migration generation.
 
-Total Tables: 14 (11 original + 4 surveillance tables - 1 old surveillance table)
-- Master tables (4): Security, Index, IndustryClassification, MarketHoliday
+Total Tables: 15 (11 original + 4 surveillance tables - 1 old surveillance table + 1 index_constituents)
+- Master tables (5): Security, Index, IndustryClassification, IndexConstituent, MarketHoliday
 - Time-series tables (3): OHLCVDaily, MarketCapHistory, CalculatedMetrics
 - Event tables (2): BulkDeal, BlockDeal
 - Surveillance tables (4): SurveillanceList, SurveillanceFundamentalFlags,
@@ -24,7 +24,7 @@ from app.models.surveillance import (
     SurveillancePriceMovement,
     SurveillancePriceVariation
 )
-from app.models.metadata import IndustryClassification, MarketHoliday, IngestionLog
+from app.models.metadata import IndustryClassification, IndexConstituent, MarketHoliday, IngestionLog
 
 __all__ = [
     # Master tables
@@ -49,6 +49,7 @@ __all__ = [
 
     # Metadata tables
     'IndustryClassification',
+    'IndexConstituent',
     'MarketHoliday',
     'IngestionLog',
 ]

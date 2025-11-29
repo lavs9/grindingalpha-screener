@@ -66,8 +66,8 @@ class Index(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     index_name = Column(String(100), unique=True, nullable=False,
                        comment="Full index name (e.g., 'Nifty 50')")
-    symbol = Column(String(50), unique=True, nullable=False, index=True,
-                   comment="Upstox symbol (e.g., 'Nifty 50' or instrument key)")
+    symbol = Column(String(100), unique=True, nullable=False, index=True,
+                   comment="Upstox symbol or NSE index name (e.g., 'Nifty 50', 'NIFTY500 MULTICAP...')")
     exchange = Column(String(20), default='NSE_INDEX',
                      comment="Exchange identifier for API calls")
     is_active = Column(Boolean, default=True,

@@ -4,6 +4,8 @@ Pydantic schemas for Security and Index models.
 These schemas are used for API request/response validation.
 Will be expanded in Phase 1.2 as API endpoints are created.
 """
+from __future__ import annotations
+
 from pydantic import BaseModel, Field
 from datetime import date, datetime
 from typing import Optional

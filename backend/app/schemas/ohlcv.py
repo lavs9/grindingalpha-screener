@@ -4,8 +4,10 @@ Pydantic schemas for OHLCV data.
 These schemas validate daily price data from Upstox API.
 Will be refined in Phase 1.3 based on actual API responses.
 """
+from __future__ import annotations
+
 from pydantic import BaseModel, Field, field_validator
-from datetime import date, datetime
+from datetime import date as date_type, datetime
 from typing import Optional
 from decimal import Decimal
 
@@ -13,7 +15,7 @@ from decimal import Decimal
 class OHLCVBase(BaseModel):
     """Base schema for OHLCV data with validation rules."""
     symbol: str = Field(..., max_length=50, description="Security symbol or index name")
-    date: date = Field(..., description="Trading date")
+    date: date_type = Field(..., description="Trading date")
     open: Decimal = Field(..., gt=0, description="Opening price")
     high: Decimal = Field(..., gt=0, description="Highest price")
     low: Decimal = Field(..., gt=0, description="Lowest price")

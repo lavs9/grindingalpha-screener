@@ -6,14 +6,16 @@ These endpoints are typically called by n8n workflows or manual triggers.
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Optional, List
+from datetime import date
 
 from app.database.session import get_db
 from app.services.nse.securities_service import ingest_securities_from_nse
 from app.services.nse.market_cap_service import ingest_market_cap_from_nse
 from app.services.nse.deals_service import ingest_deals_from_nse
 from app.services.nse.surveillance_service import fetch_surveillance_data, ingest_surveillance
-from datetime import date
+from app.services.nse.industry_service import scrape_all_securities
+from app.schemas.industry import IndustryIngestionRequest, IndustryIngestionResponse
 
 router = APIRouter()
 
@@ -528,3 +530,52 @@ async def ingest_surveillance_data(
         "total_records": total_inserted,
         "errors": fetch_result.get("errors", []) + ingest_result.get("errors", [])
     }
+
+
+@router.post("/industry-classification", response_model=IndustryIngestionResponse)
+async def ingest_industry_classification(
+    limit: Optional[int] = Query(None, gt=0, le=5000, description="Limit number of symbols to scrape (for testing)"),
+    symbols: Optional[List[str]] = Query(None, description="Specific symbols to scrape (e.g., ['RELIANCE', 'TCS'])"),
+    db: Session = Depends(get_db)
+):
+    """
+    Scrape industry classification and index constituents from NSE Quote Equity API.
+
+    This endpoint uses Playwright to authenticate with NSE and scrape the Quote Equity API
+    for all active securities, extracting:
+    1. **Industry Classification**: 4-level hierarchy (Macro > Sector > Industry > Basic Industry)
+    2. **Index Constituents**: Which indices each security belongs to (from pdSectorIndAll)
+
+    **Data Source:** https://www.nseindia.com/api/quote-equity?symbol={SYMBOL}
+
+    **Rate Limiting:** 1 request/second to respect NSE server limits
+    """
+    try:
+        # Run async scraper
+        result = await scrape_all_securities(
+            db=db,
+            limit=limit,
+            symbols=symbols
+        )
+
+        if not result["success"]:
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "message": "Industry classification scraping failed",
+                    "errors": result.get("errors", []),
+                    "symbols_processed": result.get("symbols_processed", 0),
+                    "symbols_failed": result.get("symbols_failed", 0)
+                }
+            )
+
+        return IndustryIngestionResponse(**result)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": f"Industry classification scraping failed: {str(e)}",
+                "errors": [str(e)]
+            }
+        )

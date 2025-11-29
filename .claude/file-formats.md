@@ -530,50 +530,76 @@
 
 ---
 
-## 6. Manual Upload Formats
+## 6. Index Constituents (Automated from NSE Quote API)
 
-### 6.1 Index Constituents CSV
+### 6.1 Index Membership via NSE Quote Equity API
 
-**Source:** Manual download from Niftyindices.com
+**⚠️ AUTOMATED SOURCE:** Index constituents are now automatically extracted from NSE Quote Equity API, not manual uploads.
 
-**Sample File Location:** `.claude/samples/nifty50_constituents_sample.csv`
+**Source:** NSE Quote Equity API (`metadata.pdSectorIndAll` field)
 
-**Format:** CSV (comma-separated), UTF-8 encoding
+**API Endpoint:** `https://www.nseindia.com/api/quote-equity?symbol={SYMBOL}`
 
-**Header Row:** YES (custom header, not from source)
+**Sample Response Location:** `.claude/samples/nse_quote_equity_sample.json`
 
-**Update Frequency:** Monthly (manual update)
+**Authentication:** Cookie-based (Playwright automation required)
 
-**Required Columns:**
+**Update Frequency:** Weekly (automated via scraper)
 
-| Column Name | Data Type | Required | Description | Example Value |
-|------------|-----------|----------|-------------|---------------|
-| symbol | String(50) | Yes | Security symbol | RELIANCE |
-| company_name | String(255) | Yes | Company name | Reliance Industries Limited |
-| industry | String(100) | No | Industry classification | Refineries |
-| weightage | Decimal(6,4) | Yes | Weightage in index (%) | 10.2500 |
+**Data Structure:**
+```json
+{
+  "metadata": {
+    "pdSectorIndAll": [
+      "NIFTY 50",
+      "NIFTY 100",
+      "NIFTY 200",
+      "NIFTY 500",
+      "NIFTY ENERGY",
+      "NIFTY INFRASTRUCTURE",
+      ...
+    ]
+  }
+}
+```
 
-**Upload Process:**
-1. Download constituents from Niftyindices.com
-2. Convert to CSV with required columns (may require manual formatting)
-3. Run `scripts/upload_index_constituents.py`:
-   - Provide CSV file path
-   - Provide index_name (e.g., "Nifty 50")
-   - Provide effective_from date (usually month start)
-4. Script POSTs to `/api/v1/ingest/index-constituents`
+**Database Schema:**
+- Table: `index_constituents`
+- Fields: index_id, symbol, effective_from, effective_to, weightage (NULL), created_at
+- Historical tracking via effective_from/effective_to dates
+- Weightage field is NULL (NSE Quote API does not provide weightage data)
 
-**Validation:**
-- symbol: Must exist in `securities` table
-- weightage: Sum across all constituents should be ~100% (allow ±1% tolerance)
+**Ingestion Logic:**
+1. Scrape NSE Quote API for all securities (~2500 symbols)
+2. Extract `pdSectorIndAll` array for each symbol
+3. For each index name in array:
+   - Resolve to `index_id` (auto-create index if doesn't exist)
+   - Check if constituent relationship exists with `effective_to = NULL`
+   - If not: INSERT new record with `effective_from = scrape_date`
+4. For existing constituents NOT in current scrape:
+   - Set `effective_to = scrape_date - 1` (symbol exited index)
+
+**Edge Cases:**
+- Index name not in `indices` table: Auto-created with default metadata
+- Symbol removed then re-added: New record created (don't reuse old)
+- Duplicate prevention: Unique constraint on (index_id, symbol, effective_from) WHERE effective_to IS NULL
+
+**Weightage Data:**
+- **Status:** NOT AVAILABLE in NSE Quote API
+- **Workaround:** Weightage column remains NULL
+- **Future:** Manual CSV upload or alternative data source needed for weightage
 
 **Historical Tracking:**
-- When constituents change, set effective_to = (new effective_from - 1 day) for old records
-- Insert new records with new effective_from
+- Entry date: Recorded when first seen in `pdSectorIndAll`
+- Exit date: Recorded when removed from `pdSectorIndAll`
+- Supports backtesting: Can query "which stocks were in NIFTY 50 on 2024-01-01?"
 
-**Last Verified:** 2025-01-16
+**Last Verified:** 2025-11-29
 
 **Change Log:**
-- 2025-01-16: Initial documentation
+- 2025-11-29: Changed from manual CSV uploads to automated NSE Quote API scraping
+- 2025-11-29: Added pdSectorIndAll as primary source for index membership
+- 2025-01-16: Initial documentation (manual upload approach)
 
 ---
 

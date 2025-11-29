@@ -8,8 +8,10 @@ References:
 - app/models/surveillance.py (SQLAlchemy models)
 - .claude/file-formats-surveillance.md (Specification)
 """
+from __future__ import annotations
+
 from pydantic import BaseModel, Field
-from datetime import date, datetime
+from datetime import date as date_type, datetime
 from typing import Optional
 
 
@@ -18,7 +20,7 @@ from typing import Optional
 class SurveillanceListBase(BaseModel):
     """Base schema for SurveillanceList with common fields."""
     symbol: str = Field(..., max_length=11, description="NSE security symbol")
-    date: date = Field(..., description="Data ingestion date for daily historical tracking")
+    date: date_type = Field(..., description="Data ingestion date for daily historical tracking")
     nse_exclusive: Optional[str] = Field(None, max_length=1, pattern=r"^[YN]$",
                                          description="Y=NSE exclusive, N=also listed elsewhere")
     status: Optional[str] = Field(None, max_length=1, pattern=r"^[ASI]$",
@@ -61,7 +63,7 @@ class SurveillanceListResponse(SurveillanceListBase):
 class SurveillanceFundamentalFlagsBase(BaseModel):
     """Base schema for SurveillanceFundamentalFlags."""
     symbol: str = Field(..., max_length=11, description="NSE security symbol")
-    date: date = Field(..., description="Data ingestion date")
+    date: date_type = Field(..., description="Data ingestion date")
 
     # Financial risk flags (NULL = not applicable, True = flagged)
     is_loss_making: Optional[bool] = Field(None, description="≥8 quarters loss (mainboard) or ≥2 years (SME)")
@@ -100,7 +102,7 @@ class SurveillanceFundamentalFlagsResponse(SurveillanceFundamentalFlagsBase):
 class SurveillancePriceMovementBase(BaseModel):
     """Base schema for SurveillancePriceMovement (Close-to-Close movements)."""
     symbol: str = Field(..., max_length=11, description="NSE security symbol")
-    date: date = Field(..., description="Data ingestion date")
+    date: date_type = Field(..., description="Data ingestion date")
 
     # Close-to-Close price movement flags (NULL = not flagged, True = flagged per "top 3 criteria")
     c2c_25pct_5d: Optional[bool] = Field(None, description=">25% in 5 trading days")
@@ -134,7 +136,7 @@ class SurveillancePriceMovementResponse(SurveillancePriceMovementBase):
 class SurveillancePriceVariationBase(BaseModel):
     """Base schema for SurveillancePriceVariation (High-Low volatility)."""
     symbol: str = Field(..., max_length=11, description="NSE security symbol")
-    date: date = Field(..., description="Data ingestion date")
+    date: date_type = Field(..., description="Data ingestion date")
 
     # High-Low price variation flags (NULL = not flagged, True = flagged per "top 3 criteria")
     hl_75pct_1m: Optional[bool] = Field(None, description=">75% in 1 month")
