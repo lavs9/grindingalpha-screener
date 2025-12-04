@@ -25,6 +25,10 @@ requests==2.31.0
 # Web Scraping (for NSE)
 playwright==1.40.0
 
+# Upstox Authentication
+pyotp==2.9.0
+pytz==2024.1
+
 # Environment Variables
 python-dotenv==1.0.0
 

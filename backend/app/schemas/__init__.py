@@ -47,6 +47,16 @@ from app.schemas.industry import (
     IndexConstituentListResponse,
     IndustryStatsResponse,
 )
+from app.schemas.upstox import (
+    UpstoxLoginRequest,
+    UpstoxLoginResponse,
+    UpstoxInstrumentBase,
+    UpstoxInstrumentResponse,
+    InstrumentIngestionResponse,
+    SymbolInstrumentMappingBase,
+    SymbolInstrumentMappingResponse,
+    MappingStatsResponse,
+)
 
 __all__ = [
     # Security schemas
@@ -94,4 +104,14 @@ __all__ = [
     'IndustryIngestionResponse',
     'IndexConstituentListResponse',
     'IndustryStatsResponse',
+
+    # Upstox schemas
+    'UpstoxLoginRequest',
+    'UpstoxLoginResponse',
+    'UpstoxInstrumentBase',
+    'UpstoxInstrumentResponse',
+    'InstrumentIngestionResponse',
+    'SymbolInstrumentMappingBase',
+    'SymbolInstrumentMappingResponse',
+    'MappingStatsResponse',
 ]

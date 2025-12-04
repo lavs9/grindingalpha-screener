@@ -4,7 +4,7 @@ FastAPI application entry point for Stock Screener Platform.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api.v1 import health, ingest
+from app.api.v1 import health, ingest, auth
 from app.database.session import engine
 from app.database.base import Base
 
@@ -28,6 +28,7 @@ app.add_middleware(
 
 # Include API routers
 app.include_router(health.router, prefix="/api/v1", tags=["Health"])
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(ingest.router, prefix="/api/v1/ingest", tags=["Data Ingestion"])
 
 

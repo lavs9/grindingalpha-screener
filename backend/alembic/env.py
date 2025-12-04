@@ -21,7 +21,8 @@ from app.models import (
     BulkDeal, BlockDeal,
     SurveillanceList, SurveillanceFundamentalFlags,
     SurveillancePriceMovement, SurveillancePriceVariation,
-    IndustryClassification, IndexConstituent, MarketHoliday, IngestionLog
+    IndustryClassification, IndexConstituent, MarketHoliday, IngestionLog,
+    UpstoxToken, UpstoxInstrument, SymbolInstrumentMapping
 )
 
 # this is the Alembic Config object, which provides

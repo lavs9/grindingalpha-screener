@@ -19,7 +19,11 @@ class Settings(BaseSettings):
     # Upstox API Configuration
     UPSTOX_API_KEY: str
     UPSTOX_API_SECRET: str
-    UPSTOX_ACCESS_TOKEN: str
+    UPSTOX_ACCESS_TOKEN: str  # Legacy - now stored in database
+    UPSTOX_REDIRECT_URI: str = "http://localhost:8001/callback"
+    UPSTOX_MOBILE: str
+    UPSTOX_PIN: str
+    UPSTOX_TOTP_SECRET: str
 
     # Application Configuration
     ENV: str = "development"

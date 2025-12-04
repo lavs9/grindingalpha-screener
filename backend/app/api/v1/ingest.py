@@ -16,6 +16,8 @@ from app.services.nse.deals_service import ingest_deals_from_nse
 from app.services.nse.surveillance_service import fetch_surveillance_data, ingest_surveillance
 from app.services.nse.industry_service import scrape_all_securities
 from app.schemas.industry import IndustryIngestionRequest, IndustryIngestionResponse
+from app.services.upstox.instrument_service import ingest_instruments_from_upstox
+from app.schemas.upstox import InstrumentIngestionResponse
 
 router = APIRouter()
 
@@ -579,3 +581,55 @@ async def ingest_industry_classification(
                 "errors": [str(e)]
             }
         )
+
+
+@router.post("/upstox-instruments", response_model=InstrumentIngestionResponse)
+async def ingest_upstox_instruments(db: Session = Depends(get_db)):
+    """
+    Ingest Upstox instrument master data from NSE.json.gz.
+
+    This endpoint downloads the Upstox instruments file, decompresses it,
+    and ingests all NSE instruments into the database. It also auto-creates
+    mappings between our securities table and Upstox instruments.
+
+    **Source:** https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz
+
+    **Process:**
+    1. Download gzipped JSON file from Upstox
+    2. Decompress and parse JSON
+    3. UPSERT instruments to upstox_instruments table (batch size: 500)
+    4. Auto-create symbol mappings (match by ISIN first, then symbol)
+    5. Return statistics
+
+    **Matching Logic:**
+    - Equities: exchange='NSE_EQ', match by ISIN (confidence=100) or symbol (confidence=90)
+    - Indices: Manual mapping only (not automated)
+
+    **Returns:**
+    - success: Whether ingestion completed successfully
+    - total_instruments: Total instruments in source file (~2000+ for NSE)
+    - instruments_inserted: New instruments added
+    - instruments_updated: Existing instruments updated
+    - mappings_created: Auto-created symbol mappings
+    - errors: List of errors encountered
+    - duration_seconds: Total execution time
+
+    **Note:** This endpoint should be run:
+    - Initially after setting up the database
+    - Daily via n8n workflow (instruments may change)
+    """
+
+    result = ingest_instruments_from_upstox(db=db)
+
+    if not result["success"]:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Upstox instrument ingestion failed",
+                "errors": result.get("errors", []),
+                "total_instruments": result.get("total_instruments", 0),
+                "mappings_created": result.get("mappings_created", 0)
+            }
+        )
+
+    return InstrumentIngestionResponse(**result)
