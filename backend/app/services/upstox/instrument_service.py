@@ -171,7 +171,8 @@ def create_symbol_mappings(db: Session) -> Dict:
             try:
                 # Primary: Match by ISIN
                 instrument = db.query(UpstoxInstrument).filter(
-                    UpstoxInstrument.exchange == 'NSE_EQ',
+                    UpstoxInstrument.exchange == 'NSE',
+                    UpstoxInstrument.instrument_type == 'EQ',
                     UpstoxInstrument.isin == security.isin
                 ).first()
 
@@ -181,7 +182,8 @@ def create_symbol_mappings(db: Session) -> Dict:
                 if not instrument:
                     # Fallback: Match by symbol
                     instrument = db.query(UpstoxInstrument).filter(
-                        UpstoxInstrument.exchange == 'NSE_EQ',
+                        UpstoxInstrument.exchange == 'NSE',
+                        UpstoxInstrument.instrument_type == 'EQ',
                         UpstoxInstrument.symbol == security.symbol
                     ).first()
                     match_method = 'auto_symbol'
