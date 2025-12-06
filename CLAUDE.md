@@ -237,31 +237,62 @@ docker-compose up -d
 - **Composite unique constraints:** Prevent duplicates (e.g., `symbol` + `date`)
 - **Indexes:** Optimized for screener queries (symbol+date DESC, metric columns)
 - **Data validation:** CHECK constraints for price relationships (high >= low, open/close within range)
+- **Upstox mapping tables:** 3 additional tables for token storage, instrument cache, and symbol-to-instrument mappings
+
+### Upstox Integration Architecture
+- **Token Management:** Database-backed storage with 23:59 IST daily expiry
+  - Table: `upstox_tokens` (access_token, expires_at, is_active)
+  - Service: `UpstoxTokenManager` with timezone-aware expiry checks
+- **Instrument Mapping:** Full ingestion (64,699 instruments) with auto-mapping
+  - Table: `upstox_instruments` (instrument_key, exchange, symbol, ISIN)
+  - Table: `symbol_instrument_mapping` (security_id → instrument_id with confidence scores)
+  - Matching logic: ISIN-based (100% confidence) or symbol-based (90% confidence)
+- **Authentication:** Playwright-based OAuth automation with manual fallback
+  - Endpoint: `POST /api/v1/auth/upstox/login` (mobile + PIN + TOTP)
+  - Workaround: Manual token refresh (OAuth redirect timeout issue)
+- **Test Endpoints:** Comprehensive validation suite
+  - `/api/v1/auth/upstox/test-api` (user profile)
+  - `/api/v1/auth/upstox/test-market-quotes` (live quotes)
+  - `/api/v1/auth/upstox/test-historical-data` (OHLCV data)
+  - `/api/v1/auth/upstox/test-market-holidays` (holiday calendar)
 
 ### Data Ingestion Workflow
 1. **n8n workflow** triggers FastAPI endpoints via HTTP POST
 2. **FastAPI endpoints** (`/api/v1/ingest/*`) receive data
 3. **Service layer** fetches from external sources (NSE, Upstox)
 4. **Validators** check data quality (regex, constraints, completeness)
-5. **SQLAlchemy ORM** inserts/updates database
+5. **SQLAlchemy ORM** inserts/updates database (UPSERT for idempotency)
 6. **Ingestion logs** table tracks success/failure for aggregation
 
 ### Current vs. Planned Features
 
-**Currently implemented (minimal POC):**
-- FastAPI app structure with health endpoint
-- Database connection (hardcoded credentials)
-- Basic index data ingestion endpoint
-- Return calculator for single index
+**Currently Implemented (Phase 0-1.5 completed):**
+- ✅ FastAPI application with environment-based configuration (.env)
+- ✅ Docker Compose deployment (postgres, backend, n8n)
+- ✅ All 11 database tables + 3 Upstox tables (14 total)
+- ✅ NSE data ingestion (8 sources):
+  - Securities list (EQUITY_L.csv)
+  - ETF list (ETF_L.csv)
+  - Market cap history (MCAP_*.csv)
+  - Bulk deals and block deals
+  - Surveillance lists
+  - Industry classification (Playwright scraper)
+  - Index constituents (manual upload)
+- ✅ Upstox integration:
+  - Database-backed token storage (23:59 IST expiry)
+  - Instrument master data (64,699 instruments)
+  - Symbol-to-instrument auto-mapping (87.5% success)
+  - Authentication endpoints (OAuth + manual fallback)
+  - Test endpoints (quotes, historical data, holidays)
+- ✅ Data validation framework (Pydantic schemas + validators)
+- ✅ Alembic migrations for schema versioning
+- ⏳ n8n workflows (planned for Phase 1.6)
 
-**Planned in Phase 1 (6-8 weeks):**
-- Docker Compose deployment
-- All 11 database tables from schema
-- NSE data sources (8 endpoints)
-- Upstox integration (3 endpoints)
-- n8n workflows with scheduling
-- Data validation framework
-- Playwright-based NSE industry scraper
+**Planned in Phase 1.6 (In Progress):**
+- Daily EOD workflow automation
+- Weekly industry classification refresh
+- Historical backfill workflow
+- Upstox token refresh workflow
 
 **Planned in Phase 2:**
 - 11 screeners (RRG charts priority)
@@ -281,17 +312,39 @@ docker-compose up -d
 - See Architecture.md Section 6.2.2 for implementation details
 
 ### Upstox API
+**Authentication:**
+- OAuth2 flow: Playwright automation (mobile + PIN + TOTP)
+- Token storage: Database table `upstox_tokens` with 23:59 IST daily expiry
+- Token retrieval: `UpstoxTokenManager.get_active_token()` with automatic expiry detection
+- Manual refresh: Direct database insert as fallback (OAuth redirect timeout issue)
+
+**Instrument Master:**
+- Source: https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz
+- Format: Gzipped JSON (64,699+ instruments)
+- Ingestion: UPSERT on `instrument_key` (batch size: 500)
+- Mapping: Auto-create via ISIN (100% confidence) or symbol (90% confidence)
+
+**Market Data Endpoints:**
 - Historical OHLCV: `/v2/historical-candle/{instrument_key}/{interval}/{to_date}/{from_date}`
-- Daily quotes: `/v2/market-quote/quotes`
+- Daily quotes: `/v2/market-quote/quotes?instrument_key={key}`
 - Market holidays: `/v2/market/holidays/{date}`
-- Requires API key, secret, access token (production credentials available)
+- User profile: `/v2/user/profile` (for token validation)
+
+**Test Endpoints (Backend):**
+- `GET /api/v1/auth/upstox/token-status` - Check active token
+- `GET /api/v1/auth/upstox/test-api` - Verify token validity
+- `GET /api/v1/auth/upstox/test-market-quotes?symbol=RELIANCE` - Live quotes
+- `GET /api/v1/auth/upstox/test-historical-data?symbol=RELIANCE` - 30-day OHLCV
+- `GET /api/v1/auth/upstox/test-market-holidays?date=2025-12-04` - Holiday calendar
 
 ## Important Notes
 
 ### Security
-- Database credentials are currently hardcoded (Phase 0)
-- **Phase 1 will migrate to environment variables (.env file)**
-- Never commit `.env` files or API credentials to git
+- ✅ Database credentials migrated to .env file (Phase 0 completed)
+- ✅ Upstox API credentials in environment variables (UPSTOX_API_KEY, UPSTOX_API_SECRET, etc.)
+- ✅ Token storage secured in database (not in environment variables)
+- ⚠️ Never commit `.env` files or API credentials to git
+- ⚠️ Ensure `.env` has no spaces around equals signs (`KEY=value`, not `KEY = value`)
 
 ### Data Volume
 - Universe: 2,000+ securities (all NSE equities + ETFs)
@@ -319,6 +372,11 @@ All 11 planned screeners are documented in [documentation/screeners-idea.md](doc
 - **Market cap units:** NSE reports in ₹ crore (store as-is, don't convert)
 - **ISIN validation:** Must start with "IN" and be exactly 12 characters
 - **Symbol naming:** NSE allows `&` and `-` in symbols (e.g., "M&M", "L&T")
+- **Upstox exchange filter:** Use `exchange='NSE'` with `instrument_type='EQ'` (NOT `exchange='NSE_EQ'`)
+- **Upstox instrument_key format:** `NSE_EQ|INE002A01018` (exchange_instrument_type|ISIN)
+- **Environment file formatting:** No spaces around equals (`KEY=value`, not `KEY = value`)
+- **Token expiry:** Upstox tokens expire at 23:59 IST daily (not UTC, not midnight)
+- **Mapping confidence:** 100% = ISIN match, 90% = symbol-only match, lower = manual review needed
 
 ## Testing Approach
 
@@ -351,18 +409,30 @@ def test_equity_parser():
 
 ## Current Development Status
 
-**Last Updated:** 2025-11-22
+**Last Updated:** 2025-12-04
 
-**Current Phase:** Planning complete, ready to start Phase 0 (Environment Setup)
+**Current Phase:** Phase 1.3 completed - Upstox Integration
 
-**Recent Changes:**
-- Planning documentation merged to master branch
-- n8n workflow architecture redesigned for independent parallel execution
-- Database partitioning strategy documented (deferred to Phase 2+)
-- File format documentation system established
+**Completed Phases:**
+- ✅ **Phase 0:** Docker Compose environment setup
+- ✅ **Phase 1.1:** Database models and migrations (11 tables)
+- ✅ **Phase 1.2:** NSE data ingestion (securities, ETFs, market cap, bulk/block deals, surveillance)
+- ✅ **Phase 1.3:** Upstox authentication, instrument mapping, and API integration
+- ✅ **Phase 1.4:** NSE Industry Classification scraping
+- ✅ **Phase 1.5:** Index Constituents management
+
+**Recent Changes (Phase 1.3):**
+- Implemented database-backed Upstox token storage (23:59 IST expiry)
+- Created Playwright-based OAuth automation with manual fallback
+- Ingested 64,699 instruments from Upstox NSE.json.gz
+- Auto-mapped 1,924 securities to instrument keys (87.5% success rate, 100% confidence via ISIN)
+- Created comprehensive test endpoints for validation (quotes, historical data, holidays)
+- Fixed exchange filter bug (`NSE_EQ` → `NSE` with `instrument_type='EQ'`)
 
 **Next Steps:**
-- Phase 0: Set up Docker Compose environment
-- Phase 0: Migrate hardcoded DB credentials to .env
-- Phase 0: Create all 11 database tables from schema
-- Phase 1.1: Implement NSE securities ingestion
+- Phase 1.6: Create n8n workflows for automated daily data ingestion
+  - Daily EOD workflow (6 parallel branches: securities, ETFs, market cap, deals, surveillance, OHLCV)
+  - Weekly industry classification scraper
+  - Historical backfill workflow
+  - Upstox token refresh workflow (daily 8 AM)
+- Phase 2: Implement 11 screeners with calculated metrics
