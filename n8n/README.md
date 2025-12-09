@@ -298,9 +298,20 @@ Response:
   "is_market_open": false,
   "is_trading_day": true,
   "current_time": "2025-12-06T21:00:00+05:30",
-  "next_open": "2025-12-09T09:15:00+05:30"
+  "next_open": "2025-12-09T09:15:00+05:30",
+  "message": "Market closed for the day"
 }
 ```
+
+**IMPORTANT for n8n workflows:**
+- Daily EOD workflow runs at **9 PM IST** (AFTER market close)
+- **Check `is_trading_day` field, NOT `is_market_open`**
+- `is_trading_day === false` → Skip workflow (holiday/weekend)
+- `is_trading_day === true` → Run workflow (market was open today)
+
+**Field Meanings:**
+- `is_market_open`: Currently open (9:15 AM - 3:30 PM IST) - **false at 9 PM**
+- `is_trading_day`: Market was open today (excludes weekends/holidays) - **true at 9 PM on trading days**
 
 ### 2. Daily OHLCV Endpoint
 ```

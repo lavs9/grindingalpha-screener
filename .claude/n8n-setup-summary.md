@@ -108,7 +108,8 @@ Response:
   "is_market_open": false,
   "is_trading_day": true,
   "current_time": "2025-12-06T21:00:00+05:30",
-  "next_open": "2025-12-09T09:15:00+05:30"
+  "next_open": "2025-12-09T09:15:00+05:30",
+  "message": "Market closed for the day"
 }
 ```
 
@@ -116,6 +117,17 @@ Response:
 - Query `market_holidays` table
 - Check if CURRENT_DATE is a weekend (Sat/Sun)
 - Return market status with IST timezone
+
+**CRITICAL for n8n workflows:**
+- Daily EOD workflow runs at **9 PM IST** (AFTER market close)
+- **Always check `is_trading_day` field, NOT `is_market_open`**
+- `is_trading_day === false` → Skip workflow (holiday/weekend)
+- `is_trading_day === true` → Run workflow (market was open today)
+
+**Why this matters:**
+- At 9 PM, `is_market_open` will ALWAYS be `false` (market closes at 3:30 PM)
+- But `is_trading_day` will be `true` if market was open earlier today
+- Using `is_market_open` would incorrectly skip ALL workflows!
 
 ---
 

@@ -28,7 +28,7 @@ This document outlines all n8n workflows to be implemented for the Stock Screene
 ### Architecture
 
 ```
-[Cron Trigger] → [Check Market Open?] → [Parallel Execution (6 branches)]
+[Cron Trigger] → [Check is_trading_day?] → [Parallel Execution (6 branches)]
                                               ↓
                     ┌─────────────────────────┼─────────────────────────┐
                     ↓                         ↓                         ↓
@@ -54,11 +54,12 @@ This document outlines all n8n workflows to be implemented for the Stock Screene
 - **Cron Expression:** `0 21 * * 1-5`
 - **Timezone:** Asia/Kolkata
 
-#### 2. Check Market Open (HTTP Request)
+#### 2. Check Market Status (HTTP Request)
 - **URL:** `http://backend:8000/api/v1/health/market-status`
 - **Method:** GET
-- **Expected Response:** `{"is_market_open": false, "next_open": "..."}`
-- **Branch Logic:** If market closed today (holiday), skip workflow
+- **Expected Response:** `{"is_market_open": false, "is_trading_day": true, "message": "Market closed for the day"}`
+- **Branch Logic:** If `is_trading_day === false` (holiday or weekend), skip workflow
+- **IMPORTANT:** Workflow runs at 9 PM (after market close), so check `is_trading_day`, NOT `is_market_open`
 
 #### 3. Parallel Branch 1: NSE Securities
 - **Type:** HTTP Request
