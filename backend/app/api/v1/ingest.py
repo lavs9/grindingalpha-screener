@@ -17,6 +17,8 @@ from app.services.nse.surveillance_service import fetch_surveillance_data, inges
 from app.services.nse.industry_service import scrape_all_securities
 from app.schemas.industry import IndustryIngestionRequest, IndustryIngestionResponse
 from app.services.upstox.instrument_service import ingest_instruments_from_upstox
+from app.services.upstox.daily_quotes_service import DailyQuotesService
+from app.services.upstox.historical_service import HistoricalDataService
 from app.schemas.upstox import InstrumentIngestionResponse
 
 router = APIRouter()
@@ -633,3 +635,133 @@ async def ingest_upstox_instruments(db: Session = Depends(get_db)):
         )
 
     return InstrumentIngestionResponse(**result)
+
+
+@router.post("/daily-ohlcv")
+async def ingest_daily_ohlcv(
+    symbols: Optional[List[str]] = Query(None, description="Optional list of symbols to fetch. If not provided, fetches all active securities"),
+    db: Session = Depends(get_db)
+):
+    """
+    Ingest daily OHLCV data from Upstox for all active securities.
+
+    This endpoint fetches the latest market quotes (OHLCV) from Upstox API for all active
+    securities or a specified list of symbols. It's designed to be called by the Daily EOD
+    n8n workflow after market close.
+
+    **Source:** Upstox API `/v2/market-quote/quotes`
+
+    **Process:**
+    1. Get all active securities from database (or filter by provided symbols)
+    2. Get instrument_key mappings from symbol_instrument_mapping table
+    3. Fetch market quotes from Upstox (batch request, 500 symbols per call)
+    4. Extract OHLCV, VWAP, circuits, 52w high/low
+    5. UPSERT to ohlcv_daily table (symbol + today's date)
+    6. Return statistics and errors
+
+    **Query Parameters:**
+    - symbols: Optional list of symbols (e.g., ["RELIANCE", "TCS", "INFY"])
+
+    **Returns:**
+    - success: Whether the ingestion completed successfully
+    - total_symbols: Total securities processed
+    - successful: Number of securities with data fetched successfully
+    - failed: Number of securities that failed
+    - errors: List of errors (symbol + error message)
+    - execution_time_ms: Total execution time
+
+    **Note:** This endpoint requires:
+    - Active Upstox token (check /api/v1/auth/upstox/token-status)
+    - Symbol-to-instrument mappings (run /api/v1/ingest/upstox-instruments first)
+
+    **Used By:** Daily EOD Master n8n workflow (Mon-Fri 9 PM IST)
+    """
+    service = DailyQuotesService(db)
+    result = service.fetch_daily_ohlcv(symbols=symbols)
+
+    if not result["success"]:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Daily OHLCV ingestion failed or partially completed",
+                "total_symbols": result["total_symbols"],
+                "successful": result["successful"],
+                "failed": result["failed"],
+                "errors": result["errors"][:10]  # Limit to first 10 errors
+            }
+        )
+
+    return result
+
+
+@router.post("/historical-ohlcv/{symbol}")
+async def ingest_historical_ohlcv(
+    symbol: str,
+    from_date: Optional[date] = Query(None, description="Start date (YYYY-MM-DD). Defaults to 5 years ago or listing_date"),
+    to_date: Optional[date] = Query(None, description="End date (YYYY-MM-DD). Defaults to today"),
+    db: Session = Depends(get_db)
+):
+    """
+    Ingest historical OHLCV data from Upstox for a single security.
+
+    This endpoint fetches up to 5 years of daily historical OHLCV data for a specific symbol
+    from Upstox API. It's used for initial backfill or filling gaps in historical data.
+
+    **Source:** Upstox API `/v2/historical-candle/{instrument_key}/day/{to_date}/{from_date}`
+
+    **Process:**
+    1. Validate security exists in database
+    2. Calculate date range (defaults: from=5 years ago, to=today)
+    3. Get instrument_key from symbol_instrument_mapping
+    4. Fetch historical candles from Upstox
+    5. UPSERT to ohlcv_daily table (symbol + date)
+    6. Detect gaps (missing trading days)
+    7. Return statistics
+
+    **Path Parameters:**
+    - symbol: Security symbol (e.g., "RELIANCE")
+
+    **Query Parameters:**
+    - from_date: Start date in YYYY-MM-DD format (optional)
+    - to_date: End date in YYYY-MM-DD format (optional)
+
+    **Returns:**
+    - success: Whether the ingestion completed successfully
+    - symbol: Security symbol processed
+    - records_inserted: New OHLCV records added
+    - records_updated: Existing records updated
+    - date_range: Actual date range processed
+    - gaps_detected: List of missing trading days (first 10 only)
+    - errors: List of errors encountered
+    - execution_time_ms: Total execution time
+
+    **Example:**
+    ```
+    POST /api/v1/ingest/historical-ohlcv/RELIANCE?from_date=2020-01-01&to_date=2025-12-06
+    ```
+
+    **Note:** This endpoint requires:
+    - Active Upstox token
+    - Symbol exists in securities table
+    - Instrument mapping exists for the symbol
+
+    **Used By:** Historical OHLCV Backfill n8n workflow (manual trigger)
+    """
+    service = HistoricalDataService(db)
+    result = service.fetch_historical_ohlcv(
+        symbol=symbol,
+        from_date=from_date,
+        to_date=to_date
+    )
+
+    if not result["success"]:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": f"Historical OHLCV ingestion failed for {symbol}",
+                "symbol": symbol,
+                "errors": result["errors"]
+            }
+        )
+
+    return result
