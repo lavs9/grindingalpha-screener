@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from app.models.security import Security
 from app.models.timeseries import OHLCVDaily
 from app.models.upstox import SymbolInstrumentMapping
+from app.models.metadata import IngestionLog
 from app.services.upstox.token_manager import UpstoxTokenManager
 from app.services.upstox.upstox_client import UpstoxClient
 import logging
@@ -159,6 +160,9 @@ class DailyQuotesService:
         execution_time = (datetime.now() - start_time).total_seconds() * 1000
         results["execution_time_ms"] = int(execution_time)
 
+        # Log to ingestion_logs table
+        self._log_ingestion(results, source="upstox_daily")
+
         return results
 
     def _fetch_market_quotes(self, instrument_keys: List[str]) -> Dict[str, Dict]:
@@ -271,3 +275,35 @@ class DailyQuotesService:
                 week_52_low=week_52_low
             )
             self.db.add(new_ohlcv)
+
+    def _log_ingestion(self, result: Dict[str, Any], source: str):
+        """
+        Log ingestion results to ingestion_logs table.
+
+        Args:
+            result: Result dictionary from ingestion
+            source: Source identifier (e.g., 'upstox_daily')
+        """
+        try:
+            status = "success" if result["success"] else "failure"
+            if result.get("failed", 0) > 0 and result.get("successful", 0) > 0:
+                status = "partial"
+
+            log_entry = IngestionLog(
+                source=source,
+                status=status,
+                records_fetched=result.get("total_symbols", 0),
+                records_inserted=result.get("successful", 0),
+                records_updated=0,  # Daily quotes always upsert
+                records_failed=result.get("failed", 0),
+                errors=result.get("errors", [])[:50],  # Limit to first 50 errors
+                execution_time_ms=result.get("execution_time_ms", 0)
+            )
+
+            self.db.add(log_entry)
+            self.db.commit()
+            logger.info(f"Ingestion logged to database: source={source}, status={status}")
+
+        except Exception as e:
+            logger.error(f"Failed to log ingestion to database: {str(e)}")
+            self.db.rollback()

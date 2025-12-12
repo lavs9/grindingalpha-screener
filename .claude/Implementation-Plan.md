@@ -475,6 +475,307 @@ None (foundational phase)
 
 ---
 
+## Phase 0.6: PostgreSQL 17 + Resource Monitoring Setup ✅ COMPLETED
+
+**Duration:** 1-2 days
+**Goal:** Set up PostgreSQL 17 with comprehensive resource monitoring for cloud sizing decisions
+
+**Strategy:** Run everything locally with monitoring to determine actual vCPU/RAM needs before cloud deployment.
+
+**Decision:** Using standard PostgreSQL 17 Alpine (not TimescaleDB) because:
+- DigitalOcean Managed PostgreSQL uses Apache edition which lacks advanced TimescaleDB features
+- Proper indexing on symbol + date columns provides excellent performance for our query patterns
+- Simpler operational overhead and wider hosting options available
+
+### Tasks
+
+#### 0.6.1 PostgreSQL 17 Setup ✅
+- [x] Update `docker-compose.yml` postgres service to use PostgreSQL 17 Alpine
+- [x] Update `scripts/init_db.sql` to create uuid-ossp extension only
+- [x] Remove TimescaleDB references from all documentation
+- [x] Verify PostgreSQL 17 is running with proper extensions
+
+#### 0.6.2 Add Resource Monitoring Stack
+- [ ] Add monitoring services to `docker-compose.yml`:
+  ```yaml
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: screener_prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - screener_network
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: screener_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - screener_network
+    depends_on:
+      - prometheus
+
+  # cAdvisor for container metrics
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: screener_cadvisor
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    privileged: true
+    networks:
+      - screener_network
+
+  # Postgres Exporter for database metrics
+  postgres_exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: screener_postgres_exporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?sslmode=disable"
+    ports:
+      - "9187:9187"
+    networks:
+      - screener_network
+    depends_on:
+      - postgres
+
+  volumes:
+    prometheus_data:
+    grafana_data:
+  ```
+
+#### 0.6.3 Create Prometheus Configuration
+- [ ] Create `monitoring/prometheus.yml`:
+  ```yaml
+  global:
+    scrape_interval: 15s
+    evaluation_interval: 15s
+
+  scrape_configs:
+    # FastAPI backend metrics
+    - job_name: 'backend'
+      static_configs:
+        - targets: ['backend:8000']
+
+    # PostgreSQL metrics
+    - job_name: 'postgres'
+      static_configs:
+        - targets: ['postgres_exporter:9187']
+
+    # Container metrics
+    - job_name: 'cadvisor'
+      static_configs:
+        - targets: ['cadvisor:8080']
+
+    # n8n metrics (if available)
+    - job_name: 'n8n'
+      static_configs:
+        - targets: ['n8n:5678']
+  ```
+
+#### 0.6.4 Add Prometheus Metrics to FastAPI
+- [ ] Install dependencies: `pip install prometheus-fastapi-instrumentator`
+- [ ] Update `backend/main.py`:
+  ```python
+  from prometheus_fastapi_instrumentator import Instrumentator
+
+  app = FastAPI(...)
+
+  # Add Prometheus metrics
+  Instrumentator().instrument(app).expose(app, endpoint="/metrics")
+  ```
+- [ ] Custom metrics for calculations:
+  ```python
+  # backend/app/utils/metrics.py
+  from prometheus_client import Counter, Histogram, Gauge
+
+  calculation_duration = Histogram(
+      'calculation_duration_seconds',
+      'Time spent on metric calculations',
+      ['metric_type']
+  )
+
+  memory_usage = Gauge(
+      'backend_memory_mb',
+      'Backend memory usage in MB'
+  )
+
+  calculation_errors = Counter(
+      'calculation_errors_total',
+      'Total calculation errors',
+      ['error_type']
+  )
+  ```
+
+#### 0.6.5 Create Grafana Dashboards
+- [ ] Create `monitoring/grafana/datasources/prometheus.yml`:
+  ```yaml
+  apiVersion: 1
+  datasources:
+    - name: Prometheus
+      type: prometheus
+      access: proxy
+      url: http://prometheus:9090
+      isDefault: true
+  ```
+
+- [ ] Create `monitoring/grafana/dashboards/dashboard.yml`:
+  ```yaml
+  apiVersion: 1
+  providers:
+    - name: 'Screener Dashboards'
+      folder: ''
+      type: file
+      options:
+        path: /etc/grafana/provisioning/dashboards
+  ```
+
+- [ ] Create dashboard JSON files:
+  - `monitoring/grafana/dashboards/backend_resources.json` - Backend CPU/RAM
+  - `monitoring/grafana/dashboards/database_performance.json` - PostgreSQL metrics
+  - `monitoring/grafana/dashboards/calculation_performance.json` - Phase 2 metrics
+
+#### 0.6.6 Create Resource Monitoring Guide
+- [ ] Create `monitoring/README.md`:
+  ```markdown
+  # Resource Monitoring Guide
+
+  ## Access Dashboards
+  - Grafana: http://localhost:3000 (admin/admin)
+  - Prometheus: http://localhost:9090
+  - cAdvisor: http://localhost:8080
+
+  ## Key Metrics to Monitor
+
+  ### Backend (Phase 2 Calculations)
+  - CPU usage during daily calculations
+  - RAM usage peak (determine vCPU tier)
+  - Calculation duration (target: <1 hour)
+
+  ### Database
+  - Query duration (target: <1s)
+  - Connection pool usage
+  - Disk I/O (for compression decision)
+  - Table sizes (compression effectiveness)
+
+  ### Container Resource Usage
+  - Backend container: CPU/RAM/Disk
+  - PostgreSQL container: CPU/RAM/Disk
+
+  ## Cloud Sizing Decision Matrix
+
+  **Backend Specs (based on Phase 2 monitoring):**
+  | Peak RAM | vCPU Needed | DigitalOcean Plan | Cost |
+  |----------|-------------|-------------------|------|
+  | <2 GB    | 1 vCPU      | Basic ($6/mo)     | $6   |
+  | 2-4 GB   | 2 vCPU      | Basic ($12/mo)    | $12  |
+  | 4-8 GB   | 2-4 vCPU    | General Purpose   | $24  |
+
+  **Database Specs (already decided):**
+  - 1 vCPU, 1 GB RAM, 10 GB storage = $15/month
+
+  ## Monitoring Commands
+  ```bash
+  # Check container stats
+  docker stats
+
+  # View Prometheus targets
+  curl http://localhost:9090/api/v1/targets
+
+  # Query metrics manually
+  curl http://localhost:8000/metrics
+  ```
+  ```
+
+#### 0.6.7 Add Resource Usage Logging
+- [ ] Create `backend/app/utils/resource_logger.py`:
+  ```python
+  import psutil
+  import logging
+  from datetime import datetime
+
+  logger = logging.getLogger(__name__)
+
+  def log_resource_usage(operation: str):
+      """Log CPU and RAM usage before/after operations"""
+      process = psutil.Process()
+      memory_mb = process.memory_info().rss / 1024 / 1024
+      cpu_percent = process.cpu_percent(interval=1)
+
+      logger.info(
+          f"Resource usage during {operation}: "
+          f"RAM={memory_mb:.2f}MB, CPU={cpu_percent}%"
+      )
+
+      return {
+          "operation": operation,
+          "timestamp": datetime.utcnow(),
+          "memory_mb": memory_mb,
+          "cpu_percent": cpu_percent
+      }
+  ```
+
+- [ ] Integrate in calculation endpoints:
+  ```python
+  # backend/app/services/calculators/technical.py
+  from app.utils.resource_logger import log_resource_usage
+
+  def calculate_all_metrics(symbols: List[str]):
+      log_resource_usage("start_calculations")
+
+      # Perform calculations
+      results = []
+      for symbol in symbols:
+          # Calculate metrics
+          pass
+
+      log_resource_usage("end_calculations")
+      return results
+  ```
+
+### Success Criteria
+- ✅ PostgreSQL 17 Alpine running successfully
+- ✅ Prometheus collecting metrics from all services (4 targets: backend, postgres, cadvisor, prometheus)
+- ✅ Grafana accessible at http://localhost:3000 (admin/screener_grafana_2024)
+- ✅ cAdvisor showing container resource usage
+- ✅ FastAPI `/metrics` endpoint exposing Prometheus metrics
+- ✅ Postgres Exporter tracking database metrics (size, connections, cache hit ratio)
+- ✅ Resource monitoring utility created (`backend/app/utils/resource_monitor.py`)
+- ✅ Comprehensive monitoring guide documented ([MONITORING_SETUP.md](MONITORING_SETUP.md))
+
+### Dependencies
+- Phase 0 (Docker setup) completed ✅
+
+### Status: ✅ **COMPLETED** (December 12, 2025)
+
+**Implementation Summary:**
+- All 7 Docker containers running: postgres, backend, n8n, prometheus, grafana, cadvisor, postgres_exporter
+- Removed TimescaleDB (using standard PostgreSQL 17 for better hosting compatibility)
+- Monitoring stack ready for Phase 1 data ingestion resource tracking
+
+---
+
 ## Phase 1.1: Core Database Models & Schema
 
 **Duration:** 4-6 days

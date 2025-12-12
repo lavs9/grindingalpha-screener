@@ -3,6 +3,7 @@ FastAPI application entry point for Stock Screener Platform.
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 from app.core.config import settings
 from app.api.v1 import health, ingest, auth
 from app.database.session import engine
@@ -16,6 +17,9 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+# Prometheus metrics instrumentation
+Instrumentator().instrument(app).expose(app, endpoint="/metrics")
 
 # Configure CORS middleware
 app.add_middleware(

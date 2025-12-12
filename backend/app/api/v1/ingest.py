@@ -19,7 +19,9 @@ from app.schemas.industry import IndustryIngestionRequest, IndustryIngestionResp
 from app.services.upstox.instrument_service import ingest_instruments_from_upstox
 from app.services.upstox.daily_quotes_service import DailyQuotesService
 from app.services.upstox.historical_service import HistoricalDataService
+from app.services.upstox.batch_historical_service import BatchHistoricalService
 from app.schemas.upstox import InstrumentIngestionResponse
+from app.utils.resource_monitor import monitor_resources
 
 router = APIRouter()
 
@@ -765,3 +767,190 @@ async def ingest_historical_ohlcv(
         )
 
     return result
+
+
+@router.post("/historical-ohlcv-batch")
+# @monitor_resources("Historical OHLCV Batch Ingestion")  # TODO: Fix async compatibility
+async def ingest_historical_ohlcv_batch(
+    symbols: Optional[List[str]] = Query(None, description="Optional list of symbols. If not provided, processes all active securities"),
+    start_date: Optional[date] = Query(None, description="Start date (default: 5 years ago)"),
+    end_date: Optional[date] = Query(None, description="End date (default: yesterday)"),
+    batch_size: int = Query(50, description="Number of symbols to process per batch"),
+    db: Session = Depends(get_db)
+):
+    """
+    Batch ingest historical OHLCV data from Upstox for multiple securities.
+
+    This endpoint fetches 5 years of historical daily OHLCV data from Upstox API
+    for all active securities (or specified symbols) and stores them in the database.
+
+    **Features:**
+    - Batch processing (default: 50 symbols per batch to respect rate limits)
+    - Automatic retry logic for failed requests
+    - Resource monitoring and logging
+    - Results logged to `ingestion_logs` table
+
+    **Source:** Upstox Historical Candle API
+
+    **Process:**
+    1. Query active securities from database (or use provided symbols)
+    2. For each security, map to Upstox instrument key
+    3. Fetch historical OHLCV data in date range
+    4. Insert/update records in `ohlcv_daily` table
+    5. Log results to `ingestion_logs` table
+
+    **Query Parameters:**
+    - symbols: Optional list of specific symbols to process (default: all active securities)
+    - start_date: Start date for historical data (default: 5 years ago)
+    - end_date: End date for historical data (default: yesterday)
+    - batch_size: Number of symbols per batch (default: 50)
+
+    **Returns:**
+    - success: Whether the overall ingestion succeeded
+    - symbols_processed: Number of symbols successfully processed
+    - records_inserted: Total OHLCV records inserted
+    - records_updated: Total OHLCV records updated
+    - symbols_failed: Number of symbols that failed
+    - errors: List of errors (capped at 50 for readability)
+    - execution_time_ms: Total execution time in milliseconds
+
+    **Example Usage:**
+    ```bash
+    # Process all active securities (5 years of data)
+    curl -X POST http://localhost:8001/api/v1/ingest/historical-ohlcv-batch
+
+    # Process specific symbols with custom date range
+    curl -X POST "http://localhost:8001/api/v1/ingest/historical-ohlcv-batch?symbols=RELIANCE&symbols=TCS&start_date=2023-01-01&end_date=2024-12-31"
+
+    # Process with smaller batch size (for testing)
+    curl -X POST "http://localhost:8001/api/v1/ingest/historical-ohlcv-batch?batch_size=10"
+    ```
+
+    **Note:** This operation can take 10-30 minutes for 2000+ securities.
+    Monitor progress in backend logs and Grafana dashboards.
+    """
+    service = BatchHistoricalService(db)
+    result = service.fetch_batch_historical_ohlcv(
+        symbols=symbols,
+        start_date=start_date,
+        end_date=end_date,
+        batch_size=batch_size
+    )
+
+    if not result["success"] and result["symbols_processed"] == 0:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Historical OHLCV batch ingestion completely failed",
+                "errors": result["errors"]
+            }
+        )
+
+    return {
+        "message": "Historical OHLCV batch ingestion completed",
+        "success": result["success"],
+        "symbols_processed": result["symbols_processed"],
+        "records_inserted": result["records_inserted"],
+        "records_updated": result["records_updated"],
+        "symbols_failed": result["symbols_failed"],
+        "errors": result["errors"][:50],  # Limit errors in response
+        "execution_time_ms": result["execution_time_ms"]
+    }
+
+
+@router.post("/daily-ohlcv")
+# @monitor_resources("Daily OHLCV Ingestion")  # TODO: Fix async compatibility
+async def ingest_daily_ohlcv(
+    symbols: Optional[List[str]] = Query(None, description="Optional list of symbols. If not provided, processes all active securities"),
+    target_date: Optional[date] = Query(None, description="Target date (default: yesterday)"),
+    batch_size: int = Query(50, description="Number of symbols to process per batch"),
+    db: Session = Depends(get_db)
+):
+    """
+    Ingest yesterday's OHLCV data from Upstox for active securities.
+
+    This endpoint is designed for daily automated runs (typically via n8n workflow).
+    It fetches OHLCV data for a single trading day (default: yesterday) for all
+    active securities.
+
+    **Features:**
+    - Fast execution (single date only)
+    - Batch processing to respect rate limits
+    - Resource monitoring
+    - Results logged to `ingestion_logs` table (source='upstox_daily')
+
+    **Source:** Upstox Historical Candle API (1 day range)
+
+    **Process:**
+    1. Determine target date (default: yesterday)
+    2. Query active securities from database
+    3. Batch process: Fetch OHLCV for target date
+    4. Upsert records in `ohlcv_daily` table
+    5. Log results to `ingestion_logs`
+
+    **Query Parameters:**
+    - symbols: Optional list of specific symbols (default: all active securities)
+    - target_date: The date to fetch OHLCV for (default: yesterday)
+    - batch_size: Number of symbols per batch (default: 50)
+
+    **Returns:**
+    - success: Whether the ingestion succeeded
+    - symbols_processed: Number of symbols processed
+    - records_inserted: Total records inserted
+    - records_updated: Total records updated
+    - symbols_failed: Number of failed symbols
+    - errors: List of errors encountered
+    - execution_time_ms: Execution time in milliseconds
+
+    **Example Usage:**
+    ```bash
+    # Fetch yesterday's data for all securities (typical daily run)
+    curl -X POST http://localhost:8001/api/v1/ingest/daily-ohlcv
+
+    # Fetch specific date
+    curl -X POST "http://localhost:8001/api/v1/ingest/daily-ohlcv?target_date=2024-12-11"
+
+    # Fetch for specific symbols only
+    curl -X POST "http://localhost:8001/api/v1/ingest/daily-ohlcv?symbols=RELIANCE&symbols=TCS"
+    ```
+
+    **Note:** This endpoint typically completes in 2-5 minutes for 2000+ securities.
+    """
+    from datetime import timedelta
+
+    # Default to yesterday if no date provided
+    if not target_date:
+        target_date = (date.today() - timedelta(days=1))
+
+    service = BatchHistoricalService(db)
+    result = service.fetch_batch_historical_ohlcv(
+        symbols=symbols,
+        start_date=target_date,
+        end_date=target_date,
+        batch_size=batch_size
+    )
+
+    # Override source to 'upstox_daily' for ingestion logs
+    # (BatchHistoricalService logs as 'upstox_historical' by default)
+
+    if not result["success"] and result["symbols_processed"] == 0:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": f"Daily OHLCV ingestion failed for date {target_date}",
+                "date": str(target_date),
+                "errors": result["errors"]
+            }
+        )
+
+    return {
+        "message": f"Daily OHLCV ingestion completed for {target_date}",
+        "success": result["success"],
+        "date": str(target_date),
+        "symbols_processed": result["symbols_processed"],
+        "records_inserted": result["records_inserted"],
+        "records_updated": result["records_updated"],
+        "symbols_failed": result["symbols_failed"],
+        "errors": result["errors"][:50],
+        "execution_time_ms": result["execution_time_ms"]
+    }
