@@ -495,8 +495,8 @@ None (foundational phase)
 - [x] Remove TimescaleDB references from all documentation
 - [x] Verify PostgreSQL 17 is running with proper extensions
 
-#### 0.6.2 Add Resource Monitoring Stack
-- [ ] Add monitoring services to `docker-compose.yml`:
+#### 0.6.2 Add Resource Monitoring Stack✅
+- [x] Add monitoring services to `docker-compose.yml`:
   ```yaml
   # Prometheus for metrics collection
   prometheus:
@@ -565,8 +565,8 @@ None (foundational phase)
     grafana_data:
   ```
 
-#### 0.6.3 Create Prometheus Configuration
-- [ ] Create `monitoring/prometheus.yml`:
+#### 0.6.3 Create Prometheus Configuration✅
+- [x] Create `monitoring/prometheus.yml`:
   ```yaml
   global:
     scrape_interval: 15s
@@ -594,9 +594,9 @@ None (foundational phase)
         - targets: ['n8n:5678']
   ```
 
-#### 0.6.4 Add Prometheus Metrics to FastAPI
-- [ ] Install dependencies: `pip install prometheus-fastapi-instrumentator`
-- [ ] Update `backend/main.py`:
+#### 0.6.4 Add Prometheus Metrics to FastAPI✅
+- [x] Install dependencies: `pip install prometheus-fastapi-instrumentator`
+- [x] Update `backend/main.py`:
   ```python
   from prometheus_fastapi_instrumentator import Instrumentator
 
@@ -605,7 +605,7 @@ None (foundational phase)
   # Add Prometheus metrics
   Instrumentator().instrument(app).expose(app, endpoint="/metrics")
   ```
-- [ ] Custom metrics for calculations:
+- [x] Custom metrics for calculations:
   ```python
   # backend/app/utils/metrics.py
   from prometheus_client import Counter, Histogram, Gauge
@@ -628,8 +628,8 @@ None (foundational phase)
   )
   ```
 
-#### 0.6.5 Create Grafana Dashboards
-- [ ] Create `monitoring/grafana/datasources/prometheus.yml`:
+#### 0.6.5 Create Grafana Dashboards✅
+- [x] Create `monitoring/grafana/datasources/prometheus.yml`:
   ```yaml
   apiVersion: 1
   datasources:
@@ -640,7 +640,7 @@ None (foundational phase)
       isDefault: true
   ```
 
-- [ ] Create `monitoring/grafana/dashboards/dashboard.yml`:
+- [x] Create `monitoring/grafana/dashboards/dashboard.yml`:
   ```yaml
   apiVersion: 1
   providers:
@@ -651,13 +651,13 @@ None (foundational phase)
         path: /etc/grafana/provisioning/dashboards
   ```
 
-- [ ] Create dashboard JSON files:
+- [x] Create dashboard JSON files:
   - `monitoring/grafana/dashboards/backend_resources.json` - Backend CPU/RAM
   - `monitoring/grafana/dashboards/database_performance.json` - PostgreSQL metrics
   - `monitoring/grafana/dashboards/calculation_performance.json` - Phase 2 metrics
 
-#### 0.6.6 Create Resource Monitoring Guide
-- [ ] Create `monitoring/README.md`:
+#### 0.6.6 Create Resource Monitoring Guide✅
+- [x] Create `monitoring/README.md`:
   ```markdown
   # Resource Monitoring Guide
 
@@ -708,8 +708,8 @@ None (foundational phase)
   ```
   ```
 
-#### 0.6.7 Add Resource Usage Logging
-- [ ] Create `backend/app/utils/resource_logger.py`:
+#### 0.6.7 Add Resource Usage Logging✅
+- [x] Create `backend/app/utils/resource_logger.py`:
   ```python
   import psutil
   import logging
@@ -736,7 +736,7 @@ None (foundational phase)
       }
   ```
 
-- [ ] Integrate in calculation endpoints:
+- [x] Integrate in calculation endpoints:
   ```python
   # backend/app/services/calculators/technical.py
   from app.utils.resource_logger import log_resource_usage
