@@ -1,9 +1,9 @@
 # Implementation Plan
 ## Indian Stock Market Screener Platform - Phase 1 (Data Storage)
 
-**Version:** 1.1
-**Date:** November 30, 2025
-**Status:** In Progress - Phase 1.3 (Upstox Integration)
+**Version:** 1.2
+**Date:** December 13, 2025
+**Status:** In Progress - Phase 1.6 (Data Quality & OHLCV Ingestion)
 
 ---
 
@@ -1172,8 +1172,8 @@ Create `tests/test_nse_scraper.py`:
 - **Instrument Mapping:** Implemented full ingestion (64,699 instruments) instead of on-demand mapping for better performance
 - **Exchange Filter:** Fixed from `exchange='NSE_EQ'` to `exchange='NSE'` with `instrument_type='EQ'` to match actual Upstox data format
 - **Testing:** Created comprehensive test endpoints instead of unit tests for faster validation
-- **Historical OHLCV:** Deferred to Phase 1.6 (will be integrated into n8n workflows)
-- **Daily OHLCV:** Deferred to Phase 1.6 (will be integrated into n8n workflows)
+- **Historical OHLCV:** ✅ Implemented in Phase 1.6 (batch endpoint created)
+- **Daily OHLCV:** ✅ Implemented in Phase 1.6 (daily endpoint created)
 - **Market Holidays:** Test endpoint created; full ingestion deferred to Phase 1.6
 
 ### Success Criteria (Actual Results)
@@ -1183,8 +1183,8 @@ Create `tests/test_nse_scraper.py`:
 - ✅ **Token management working** - Active token retrieval, expiry detection, manual refresh capability
 - ✅ **Error handling implemented** - Graceful handling of API errors, database conflicts, missing mappings
 - ⚠️ **OAuth flow partially working** - Playwright automation times out at redirect; manual fallback functional
-- ⏳ **Historical OHLCV ingestion** - Deferred to Phase 1.6 (n8n workflow integration)
-- ⏳ **Daily OHLCV ingestion** - Deferred to Phase 1.6 (n8n workflow integration)
+- ✅ **Historical OHLCV ingestion** - Completed in Phase 1.6 (POST /api/v1/ingest/historical-ohlcv-batch)
+- ✅ **Daily OHLCV ingestion** - Completed in Phase 1.6 (POST /api/v1/ingest/daily-ohlcv)
 - ⏳ **Market holidays full ingestion** - Test endpoint working, full ingestion deferred to Phase 1.6
 
 ### Files Created/Modified
@@ -1549,7 +1549,31 @@ Workflow name: `Historical_Data_Backfill`
 **Duration:** 3-4 days
 **Goal:** Implement data quality checks, monitoring endpoints, and comprehensive documentation
 
+**Status:** ⏳ **IN PROGRESS** - OHLCV ingestion endpoints completed (December 13, 2025)
+
 ### Tasks
+
+#### 1.6.0 OHLCV Data Ingestion ✅ COMPLETED
+- [x] **Create `ingestion_logs` table**
+  - Migration: `e9dd4cc896bc_add_ingestion_logs_table.py` ✅
+  - Table structure: id, source, status, records_fetched, records_inserted, records_updated, records_failed, errors (JSON), execution_time_ms, timestamp
+  - Indexes: source+timestamp, timestamp
+
+- [x] **POST /api/v1/ingest/historical-ohlcv-batch**
+  - Batch processing for historical OHLCV data (default: 5 years)
+  - Features: Batch size control (default: 50), resource monitoring, error handling
+  - Uses existing `BatchHistoricalService`
+  - Logs results to `ingestion_logs` table
+  - Test results: 3 symbols, 78 records, 931ms execution time ✅
+
+- [x] **POST /api/v1/ingest/daily-ohlcv**
+  - Single-day OHLCV ingestion (default: yesterday)
+  - Designed for daily automated n8n workflows
+  - Batch processing with error handling
+  - Logs results to `ingestion_logs` table
+
+**Known Issues:**
+- `@monitor_resources` decorator has async compatibility issue (temporarily disabled with TODO comment)
 
 #### 1.6.1 Create Data Quality Endpoints
 - [ ] **GET /api/v1/status/data-quality**
@@ -1561,24 +1585,10 @@ Workflow name: `Historical_Data_Backfill`
     - Gap detection: Missing dates in OHLCV for top 50 securities (sample)
   - Return JSON report
 
-- [ ] **GET /api/v1/status/ingestion**
-  - Create new table: `ingestion_logs`
-    ```sql
-    CREATE TABLE ingestion_logs (
-      id SERIAL PRIMARY KEY,
-      source VARCHAR(50),  -- 'nse_securities', 'upstox_ohlcv', etc.
-      status VARCHAR(20),  -- 'success', 'failure', 'partial'
-      records_fetched INTEGER,
-      records_inserted INTEGER,
-      records_failed INTEGER,
-      errors JSONB,
-      execution_time_ms INTEGER,
-      timestamp TIMESTAMP DEFAULT NOW()
-    );
-    ```
-  - Update all ingestion endpoints to log to this table
-  - Query latest status for each source
-  - Return summary
+- [x] **GET /api/v1/status/ingestion** - Partially implemented
+  - ✅ `ingestion_logs` table created and functional
+  - ⏳ Need to create query endpoint to return latest status for each source
+  - ⏳ Need to update remaining ingestion endpoints to log to this table
 
 #### 1.6.2 Implement Logging Infrastructure
 - [ ] Configure structured logging (JSON format)

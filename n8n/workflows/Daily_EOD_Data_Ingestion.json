@@ -1,0 +1,216 @@
+{
+  "name": "Daily EOD Data Ingestion",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 20 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Daily at 8:30 PM IST (Mon-Fri)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://backend:8000/api/v1/status/is-trading-day",
+        "authentication": "none",
+        "options": {}
+      },
+      "id": "check-trading-day",
+      "name": "Check if Trading Day",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.is_trading_day}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "if-trading-day",
+      "name": "Is Trading Day?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8000/api/v1/ingest/daily-ohlcv",
+        "authentication": "none",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "ingest-daily-ohlcv",
+      "name": "Ingest Daily OHLCV",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8000/api/v1/ingest/securities",
+        "authentication": "none",
+        "options": {}
+      },
+      "id": "ingest-securities",
+      "name": "Ingest Securities List",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8000/api/v1/ingest/market-cap",
+        "authentication": "none",
+        "options": {}
+      },
+      "id": "ingest-market-cap",
+      "name": "Ingest Market Cap",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "url": "http://backend:8000/api/v1/status/ingestion",
+        "authentication": "none",
+        "options": {}
+      },
+      "id": "check-ingestion-status",
+      "name": "Check Ingestion Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{JSON.stringify({\n  \"workflow\": \"Daily EOD Data Ingestion\",\n  \"date\": $now.toISO(),\n  \"status\": $json.successful_sources === $json.total_sources ? \"success\" : \"partial\",\n  \"successful\": $json.successful_sources,\n  \"total\": $json.total_sources,\n  \"failed\": $json.failed_sources,\n  \"sources\": $json.sources\n}, null, 2)}}"
+      },
+      "id": "format-summary",
+      "name": "Format Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 300]
+    }
+  ],
+  "connections": {
+    "Daily at 8:30 PM IST (Mon-Fri)": {
+      "main": [
+        [
+          {
+            "node": "Check if Trading Day",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if Trading Day": {
+      "main": [
+        [
+          {
+            "node": "Is Trading Day?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Trading Day?": {
+      "main": [
+        [
+          {
+            "node": "Ingest Daily OHLCV",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Ingest Securities List",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Ingest Market Cap",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ingest Daily OHLCV": {
+      "main": [
+        [
+          {
+            "node": "Check Ingestion Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ingest Securities List": {
+      "main": [
+        [
+          {
+            "node": "Check Ingestion Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ingest Market Cap": {
+      "main": [
+        [
+          {
+            "node": "Check Ingestion Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Ingestion Status": {
+      "main": [
+        [
+          {
+            "node": "Format Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-12-13T06:00:00.000Z",
+  "versionId": "1"
+}

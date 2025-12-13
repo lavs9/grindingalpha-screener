@@ -1,0 +1,81 @@
+{
+  "name": "Historical Backfill OHLCV Data",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "When clicking 'Test workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8000/api/v1/ingest/historical-ohlcv-batch",
+        "authentication": "none",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "batch_size",
+              "value": "50"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        }
+      },
+      "id": "backfill-historical",
+      "name": "Backfill Historical OHLCV (5 years)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{JSON.stringify({\n  \"workflow\": \"Historical Backfill OHLCV\",\n  \"completed_at\": $now.toISO(),\n  \"symbols_processed\": $json.symbols_processed,\n  \"records_inserted\": $json.records_inserted,\n  \"records_updated\": $json.records_updated,\n  \"symbols_failed\": $json.symbols_failed,\n  \"execution_time_seconds\": Math.round($json.execution_time_ms / 1000),\n  \"status\": $json.success ? \"success\" : \"failed\",\n  \"errors_summary\": $json.errors.slice(0, 5)\n}, null, 2)}}"
+      },
+      "id": "format-summary",
+      "name": "Format Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    }
+  ],
+  "connections": {
+    "When clicking 'Test workflow'": {
+      "main": [
+        [
+          {
+            "node": "Backfill Historical OHLCV (5 years)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backfill Historical OHLCV (5 years)": {
+      "main": [
+        [
+          {
+            "node": "Format Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-12-13T06:00:00.000Z",
+  "versionId": "1"
+}

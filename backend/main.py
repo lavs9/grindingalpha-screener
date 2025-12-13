@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 from app.core.config import settings
-from app.api.v1 import health, ingest, auth
+from app.api.v1 import health, ingest, auth, status
 from app.database.session import engine
 from app.database.base import Base
 
@@ -32,6 +32,7 @@ app.add_middleware(
 
 # Include API routers
 app.include_router(health.router, prefix="/api/v1", tags=["Health"])
+app.include_router(status.router, prefix="/api/v1/status", tags=["Status & Monitoring"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(ingest.router, prefix="/api/v1/ingest", tags=["Data Ingestion"])
 

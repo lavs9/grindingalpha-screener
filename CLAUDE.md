@@ -337,6 +337,17 @@ docker-compose up -d
 - `GET /api/v1/auth/upstox/test-historical-data?symbol=RELIANCE` - 30-day OHLCV
 - `GET /api/v1/auth/upstox/test-market-holidays?date=2025-12-04` - Holiday calendar
 
+**OHLCV Ingestion Endpoints (Backend):**
+- `POST /api/v1/ingest/historical-ohlcv-batch` - Batch historical OHLCV data ingestion
+  - Query params: `symbols` (optional list), `start_date` (default: 5 years ago), `end_date` (default: yesterday), `batch_size` (default: 50)
+  - Returns: `{symbols_processed, records_inserted, records_updated, symbols_failed, errors, execution_time_ms}`
+  - Example: `curl -X POST "http://localhost:8001/api/v1/ingest/historical-ohlcv-batch?symbols=RELIANCE&symbols=TCS"`
+
+- `POST /api/v1/ingest/daily-ohlcv` - Daily OHLCV data ingestion
+  - Query params: `symbols` (optional list), `target_date` (default: yesterday), `batch_size` (default: 50)
+  - Returns: `{symbols_processed, records_inserted, records_updated, symbols_failed, errors, execution_time_ms}`
+  - Example: `curl -X POST "http://localhost:8001/api/v1/ingest/daily-ohlcv"`
+
 ## Important Notes
 
 ### Security
@@ -409,28 +420,46 @@ def test_equity_parser():
 
 ## Current Development Status
 
-**Last Updated:** 2025-12-04
+**Last Updated:** 2025-12-13
 
-**Current Phase:** Phase 1.3 completed - Upstox Integration
+**Current Phase:** Phase 1.6 in progress - OHLCV Ingestion & Data Quality
 
 **Completed Phases:**
-- ✅ **Phase 0:** Docker Compose environment setup
-- ✅ **Phase 1.1:** Database models and migrations (11 tables)
+- ✅ **Phase 0:** Docker Compose environment setup (November 29, 2025)
+- ✅ **Phase 0.6:** PostgreSQL 17 + Resource Monitoring Setup (December 12, 2025)
+- ✅ **Phase 1.1:** Database models and migrations (14 tables: 11 core + 3 Upstox)
 - ✅ **Phase 1.2:** NSE data ingestion (securities, ETFs, market cap, bulk/block deals, surveillance)
 - ✅ **Phase 1.3:** Upstox authentication, instrument mapping, and API integration
 - ✅ **Phase 1.4:** NSE Industry Classification scraping
 - ✅ **Phase 1.5:** Index Constituents management
+- ✅ **Phase 1.6 (Partial):** OHLCV data ingestion endpoints (December 13, 2025)
 
-**Recent Changes (Phase 1.3):**
-- Implemented database-backed Upstox token storage (23:59 IST expiry)
-- Created Playwright-based OAuth automation with manual fallback
-- Ingested 64,699 instruments from Upstox NSE.json.gz
-- Auto-mapped 1,924 securities to instrument keys (87.5% success rate, 100% confidence via ISIN)
-- Created comprehensive test endpoints for validation (quotes, historical data, holidays)
-- Fixed exchange filter bug (`NSE_EQ` → `NSE` with `instrument_type='EQ'`)
+**Recent Changes (Phase 1.6 - OHLCV Implementation):**
+- Created `ingestion_logs` table for tracking all data ingestion operations
+- Implemented `POST /api/v1/ingest/historical-ohlcv-batch` endpoint (batch historical OHLCV data)
+  - Default: 5 years historical data for all active securities
+  - Batch processing: 50 symbols per batch to respect Upstox API rate limits
+  - Resource monitoring and comprehensive error handling
+  - Automatic logging to `ingestion_logs` table
+- Implemented `POST /api/v1/ingest/daily-ohlcv` endpoint (single-day OHLCV data)
+  - Default: Yesterday's data for all active securities
+  - Designed for daily automated n8n workflows
+  - Batch processing with error handling
+- Successfully tested with real Upstox API data (3 symbols, 78 records, 931ms execution time)
+- Added `BatchHistoricalService` for reusable OHLCV ingestion logic
+- Updated resource monitoring utility (`app/utils/resource_monitor.py`)
+
+**Known Issues:**
+- `@monitor_resources` decorator has async compatibility issue (temporarily disabled with TODO comment)
 
 **Next Steps:**
-- Phase 1.6: Create n8n workflows for automated daily data ingestion
+- Phase 1.6 (Remaining):
+  - Create data quality endpoints (`GET /api/v1/status/data-quality`, `GET /api/v1/status/ingestion`)
+  - Implement structured logging infrastructure
+  - Set up automated database backups
+  - Update README.md with complete setup instructions
+  - Final integration testing (full-scale OHLCV ingestion)
+- Phase 1.5 (n8n workflows): Create automated workflows for daily data ingestion
   - Daily EOD workflow (6 parallel branches: securities, ETFs, market cap, deals, surveillance, OHLCV)
   - Weekly industry classification scraper
   - Historical backfill workflow
