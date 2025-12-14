@@ -53,6 +53,116 @@ This is an Indian stock market screener platform that aggregates data from NSE (
 
 **📖 Read [CONTRIBUTING.md](CONTRIBUTING.md) first** - It contains essential coding standards, validation rules, testing requirements, and common pitfalls to avoid.
 
+## Git Workflow - Branch-Based Development
+
+**CRITICAL: Always work on feature branches, NEVER commit directly to master.**
+
+### Branch Naming Convention
+```
+feature/{phase}-{description}  # For new features
+bugfix/{issue-description}     # For bug fixes
+refactor/{component-name}      # For refactoring
+docs/{update-description}      # For documentation
+
+Examples:
+- feature/phase-1.6-data-quality-endpoints
+- feature/phase-2-rrg-screener
+- bugfix/ohlcv-duplicate-records
+- refactor/upstox-token-service
+- docs/update-api-documentation
+```
+
+### Development Workflow
+
+**Before starting any work:**
+```bash
+# 1. Ensure master is up to date
+git checkout master
+git pull origin master
+
+# 2. Create feature branch
+git checkout -b feature/phase-1.6-data-quality-endpoints
+
+# 3. Make changes, commit regularly
+git add .
+git commit -m "feat: Add data quality endpoint"
+
+# 4. Push feature branch to remote
+git push origin feature/phase-1.6-data-quality-endpoints
+
+# 5. Create Pull Request on GitHub
+# 6. After PR approval, merge to master (via GitHub UI)
+# 7. Delete feature branch locally and remotely
+git checkout master
+git pull origin master
+git branch -d feature/phase-1.6-data-quality-endpoints
+git push origin --delete feature/phase-1.6-data-quality-endpoints
+```
+
+**NEVER do this:**
+```bash
+# ❌ WRONG - Direct commit to master
+git checkout master
+git add .
+git commit -m "changes"
+git push origin master
+```
+
+**Always do this:**
+```bash
+# ✅ CORRECT - Feature branch workflow
+git checkout -b feature/my-feature
+git add .
+git commit -m "feat: Add my feature"
+git push origin feature/my-feature
+# Then create Pull Request on GitHub
+```
+
+### Commit Message Format
+
+Follow [Conventional Commits](https://www.conventionalcommits.org/):
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+**Types:**
+- `feat`: New feature
+- `fix`: Bug fix
+- `refactor`: Code refactoring
+- `docs`: Documentation updates
+- `test`: Adding/updating tests
+- `chore`: Maintenance tasks
+
+**Examples:**
+```
+feat(api): Add data quality endpoint
+
+Implement GET /api/v1/status/data-quality endpoint to check
+data completeness, missing dates, and outliers.
+
+Closes #45
+
+---
+
+fix(upstox): Handle token expiry edge case
+
+Fixed issue where tokens expiring at exactly 23:59 IST were
+not being detected as expired.
+
+Closes #78
+
+---
+
+refactor(services): Extract OHLCV ingestion logic
+
+Move common OHLCV ingestion logic from individual services
+to BatchHistoricalService for better code reuse.
+```
+
 ## Critical Development Rules
 
 ### 1. File Format Documentation System
