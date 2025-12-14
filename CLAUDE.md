@@ -530,9 +530,9 @@ def test_equity_parser():
 
 ## Current Development Status
 
-**Last Updated:** 2025-12-13
+**Last Updated:** 2025-12-14
 
-**Current Phase:** Phase 1.6 in progress - OHLCV Ingestion & Data Quality
+**Current Phase:** Phase 1 COMPLETED ✅
 
 **Completed Phases:**
 - ✅ **Phase 0:** Docker Compose environment setup (November 29, 2025)
@@ -541,15 +541,17 @@ def test_equity_parser():
 - ✅ **Phase 1.2:** NSE data ingestion (securities, ETFs, market cap, bulk/block deals, surveillance)
 - ✅ **Phase 1.3:** Upstox authentication, instrument mapping, and API integration
 - ✅ **Phase 1.4:** NSE Industry Classification scraping
-- ✅ **Phase 1.5:** Index Constituents management
-- ✅ **Phase 1.6 (Partial):** OHLCV data ingestion endpoints (December 13, 2025)
+- ✅ **Phase 1.5:** n8n Workflows (4 workflows: Daily EOD, Token Refresh, Weekly Industry, Historical Backfill)
+- ✅ **Phase 1.6:** OHLCV Ingestion, Data Quality Monitoring & Structured Logging (December 14, 2025)
 
-**Recent Changes (Phase 1.6 - OHLCV Implementation):**
+**Recent Changes (Phase 1.6 - Completed December 14, 2025):**
+
+**OHLCV Ingestion:**
 - Created `ingestion_logs` table for tracking all data ingestion operations
 - Implemented `POST /api/v1/ingest/historical-ohlcv-batch` endpoint (batch historical OHLCV data)
   - Default: 5 years historical data for all active securities
   - Batch processing: 50 symbols per batch to respect Upstox API rate limits
-  - Resource monitoring and comprehensive error handling
+  - Resource monitoring with `@monitor_resources` decorator
   - Automatic logging to `ingestion_logs` table
 - Implemented `POST /api/v1/ingest/daily-ohlcv` endpoint (single-day OHLCV data)
   - Default: Yesterday's data for all active securities
@@ -557,21 +559,41 @@ def test_equity_parser():
   - Batch processing with error handling
 - Successfully tested with real Upstox API data (3 symbols, 78 records, 931ms execution time)
 - Added `BatchHistoricalService` for reusable OHLCV ingestion logic
-- Updated resource monitoring utility (`app/utils/resource_monitor.py`)
 
-**Known Issues:**
-- `@monitor_resources` decorator has async compatibility issue (temporarily disabled with TODO comment)
+**n8n Workflows (Phase 1.5):**
+- Fixed `@monitor_resources` async decorator (now using `asyncio.iscoroutinefunction()`)
+- Created 4 production-ready workflows:
+  1. Daily EOD Data Ingestion (Mon-Fri 8:30 PM IST) - 6 parallel branches + conditional OHLCV
+  2. Upstox Token Refresh (Mon-Fri 8:00 AM IST) - Automatic Playwright authentication
+  3. Weekly Industry Classification (Sundays 10:00 PM IST) - NSE Quote Equity scraper
+  4. Historical Backfill OHLCV (Manual trigger) - 5-year backfill for all securities
 
-**Next Steps:**
-- Phase 1.6 (Remaining):
-  - Create data quality endpoints (`GET /api/v1/status/data-quality`, `GET /api/v1/status/ingestion`)
-  - Implement structured logging infrastructure
-  - Set up automated database backups
-  - Update README.md with complete setup instructions
-  - Final integration testing (full-scale OHLCV ingestion)
-- Phase 1.5 (n8n workflows): Create automated workflows for daily data ingestion
-  - Daily EOD workflow (6 parallel branches: securities, ETFs, market cap, deals, surveillance, OHLCV)
-  - Weekly industry classification scraper
-  - Historical backfill workflow
-  - Upstox token refresh workflow (daily 8 AM)
-- Phase 2: Implement 11 screeners with calculated metrics
+**Data Quality & Monitoring (Phase 1.6):**
+- Implemented `GET /api/v1/status/data-quality` endpoint:
+  - OHLCV coverage metrics (last date, coverage %, missing symbols)
+  - Market cap coverage
+  - Industry classification coverage
+  - Data quality issue detection (invalid OHLCV, negative prices)
+  - Actionable recommendations
+- Implemented `GET /api/v1/status/ingestion` endpoint:
+  - Recent ingestion logs (last 24 hours)
+  - Latest status per source
+  - Summary by status (success/failure counts)
+- Implemented `GET /api/v1/status/is-trading-day` endpoint:
+  - Weekend and holiday detection
+  - Used by n8n Daily EOD workflow
+
+**Structured Logging:**
+- Created `app/core/logging_config.py` with:
+  - JSON-formatted file logging (structured logs)
+  - Rotating file handler (10MB per file, 10 backups)
+  - Separate error log (ERROR and CRITICAL only)
+  - Console logging with human-readable format
+  - Module-specific log levels
+- Integrated logging in main.py (startup/shutdown events)
+- Added `logs/` directory to .gitignore
+
+**Next Steps - Phase 2:**
+- Implement 11 screeners (RRG Charts priority)
+- Calculate 30+ daily metrics (VARS, ATR%, VCP, McClellan, etc.)
+- Frontend dashboard (React + Chart.js)
