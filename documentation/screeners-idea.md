@@ -1,190 +1,105 @@
-Updated Finalized List of Screeners/Scanners
-Based on the additional input from TradersLab.io (the provided dashboard image showing "Equal Weight NDX Breadth Snapshot" with advances/declines, new highs/lows, % above KMAs, and McClellan charts for breadth analysis) and a deep review of Jeff Sun's Substack guide, I've refined the list.
-The TradersLab dashboard emphasizes equal-weighted breadth metrics (e.g., NDX equivalent to Nifty 50/500), McClellan Oscillator/Summation Index for momentum divergence, and % stocks above key moving averages (KMAs like SMA20/50/200)—this enhances the Breadth Metrics Dashboard (Section 10) with McClellan components and equal-weighting specifics.
-From Jeff Sun's guide (verified as of October 29, 2025):
+Market Metrics Dashboard Documentation: Screeners, Scanners, and Calculations
+Introduction
+This document provides a comprehensive guide for building the codebase of the Market Metrics Dashboard POC, adapted for the NSE Indian stock market. It compiles the finalized list of screeners/scanners based on research from X accounts (@SteveDJacobs, @PradeepBonde, @FranVezz), TradersLab.io dashboard, and Jeff Sun's Substack process. The dashboard uses stored data: historical/daily OHLCV (Open, High, Low, Close, Volume), market cap, industry/sector mappings, and bulk/block deals.
+The focus is on momentum, relative strength (RS), price action, volume, and breadth screeners. All are NSE-adapted (e.g., universes like Nifty 50/500, market cap ≥ ₹100 crore, exclude surveillance-flagged, volume ≥100K for liquidity). Implementation uses Python (FastAPI backend, frontend, postgres supabase DB).
+Key Principles
 
-Core Enhancements: Adds ADR% (Average Daily Range % for volatility/position sizing), RVOL (Relative Volume, already partial but now with ORH/M30 Re-ORH for entry confirmation), ATR% multiples from 50-MA (expands ATR Extension with XxATR% for partial profits), VCP (Volatility Contraction Pattern for pre-breakout contraction), and PEAD (Post-Earnings Drift, but requires earnings data—flagged as additional).
-Glossary/Process Ties: Incorporates LoD distance to ATR (<60% for tight entries), R-Multiple for risk (T+3 tracking), VARS/VARW (Volatility-Adjusted RS/Weakness for better percentile calcs).
-Indicators: Swing Data (integrates ADR%, RVOL, float %) and ATR% from 50-MA scripts—add to daily calcs for screeners like MA Stacked Breakouts and Momentum Watchlist.
-No Major New Screeners: These refine existing ones (e.g., add VCP filter to Breakouts; ADR% to High-Volume Movers for sizing). PEAD needs new data, so it's in the "additional" section below.
+Daily Processing: Run EOD (8-9 PM IST) cron to ingest data, compute metrics, and update screeners.
+Historical Storage:
+Required for Most: Store historical OHLCV/market cap (at least 2 years, ideally 5) in postgres supabase for calculations like MAs (need 200+ days), RS percentiles, RRG tails (100 weeks), McClellan trends. This enables backtesting/trending (e.g., stage breakdowns over time).
+Optional/Non-Historical: Pure daily screeners (e.g., 4% gainers) can overwrite snapshots, but retain history for charts/analysis.
+Decision Rule: Keep historical if screener involves time-series (e.g., RRG, breadth charts) or patterns (e.g., VCP over 3-5 bars). Purge old data (>5 years) for storage efficiency.
 
-The list remains NSE-adapted, using stored data (OHLCV, market cap, industry/sector, bulk/block deals). Universal filters: Listed equities/ETFs, market cap ≥ ₹100 crore, exclude surveillance-flagged, volume ≥100K.
+Universal Filters: Apply to all: NSE equities/ETFs, market cap ≥ ₹100 crore, no surveillance flags, volume ≥100K.
+Tech Stack Notes: Use pandas/numpy/ta-lib for calcs; postgres supabase MergeTree for time-series (partition by date/ticker); Dash for visuals (tables/charts).
 
-For each:
-Purpose: Updated with enhancements.
-Data Required to Calculate: Inputs, now including new indicators.
-Data to be Shown: Outputs, with refinements.
+Section 1: Daily Calculated Data Points
+These are pre-computed EOD metrics stored in postgres supabase (e.g., 'daily_metrics' table with date/ticker keys). Compute universe-wide (full NSE listed stocks) for percentiles. Retain historical (append daily) for trends/backtesting.
 
-1. 4% Daily Breakouts/Gainers (Inspired by @PradeepBonde - Stockbee; Enhanced with Jeff Sun's ORH/M30 Re-ORH)
-Purpose: Momentum stocks up ≥4% with volume surge; now filters for M30 Re-ORH (post-open 30-min reclaim of opening range high) for confirmation, adapting to NSE intraday if available (or proxy with EOD).
-Data Required to Calculate:
+Price Changes: 1D/1W/1M/3M/6M % = (close_t / close_t-n - 1) * 100. (From OHLCV.)
+Relative Strength (RS): Percentile rank of price changes vs. universe (numpy.percentile or postgres supabase quantile); now VARS = RS / ATR%.
+VARW (Volatility-Adjusted Relative Weakness): Inverse VARS (1 - VARS) for laggards.
+Moving Averages: EMA10 (exponential), SMA20/50/100/200 (simple) via pandas/ta-lib.
+ATR (14-day): Wilder ATR = max(high-low, |high-prev_close|, |low-prev_close|), averaged over 14 days.
+ATR % and RS: (ATR / close * 100), percentile vs. universe.
+ATR % from 50-MA: Multiples, e.g., ((close / SMA50) - 1) / (ATR / close).
+ADR% (Average Daily Range %): Avg ((high - low) / close * 100) over 20 days.
+ATR Extension: ((close / SMA50) - 1) / (ATR / close).
+20-Day Darvas Box: Max high/min low over 20 days; price-to-range % = (close - low) / (high - low) * 100.
+RVOL (Relative Volume): Today's volume / 50-day avg volume.
+ORH/M30 Re-ORH: Opening range high (first 30-min high, proxy from daily if no intraday); M30 reclaim (close > ORH post-30 min).
+LoD ATR %: ((low_of_day - close) / ATR * 100); flag <60%.
+New 20-Day Highs/Lows: Count if high ≥ max(20-day highs) or low ≤ min(20-day lows).
+Industry/Sector Strength: Equal-weighted weekly/monthly % changes/VARS for groups (aggregate stock OHLCV by sector).
+RRG Metrics: RS-Ratio = (sector close / benchmark close) * 100 (normalized); RS-Momentum = 1-week ROC of RS-Ratio; smoothed with 1-week MA.
+Candle Type: Green if close ≥ open (with % change); red otherwise.
+Up/Down Counts: # stocks up/down over 1D/1W/1M for universes.
+McClellan Oscillator/Summation: Oscillator = 19-day EMA (advances - declines) - 39-day EMA; Summation = cumulative Oscillator.
+VCP Score: 1-5 based on narrowing (high-low) over 3-5 bars (e.g., each narrower bar +1).
+Stage Classification: 1 (close < all MAs), 2A (close > MAs but <100% Darvas), 2B (at 100% Darvas), 2C (≥7x ATR from SMA50), 3 (topping: falling but above some MAs), 4 (declining: below MAs); with LoD flag.
 
-Daily OHLCV (open, close, volume; intraday for ORH if extended).
-Previous day's volume.
-Opening range (first 30-min high from OHLCV or proxy).
-Market cap (filter ≥ ₹100 crore).
+Computation Flow:
 
-Data to be Shown:
+Ingest EOD OHLCV/market cap/sector data.
+Update historical tables (append new rows).
+Run batch calcs (e.g., pandas on universe DataFrame or postgres supabase SQL for percentiles).
+Store with date for history (e.g., query past McClellan for charts).
 
-Ticker, % Change, Volume, Rel Volume (RVOL), M30 Re-ORH (Yes/No), Market Cap.
-Sorted by % Change; separate +4%/-4% lists.
-
-2. 20% Weekly Moves (Inspired by @PradeepBonde - Stockbee; Enhanced with ADR% for Volatility Context)
-Purpose: Extreme swings for pattern study; add ADR% to flag high-volatility moves (e.g., >3% for expansive behavior).
-Data Required to Calculate:
-
-Historical OHLCV (closes over 5 days).
-Volume avg ≥100K.
-ADR% (avg (high-low)/close * 100 over 20 days).
-Market cap (filter ≥ ₹100 crore).
-
-Data to be Shown:
-
-Ticker, Weekly % Change, Volume Avg, ADR%, Market Cap, Industry/Sector.
-Separate +20%/-20% lists, sorted by absolute change.
-
-3. High-Volume Movers (Inspired by @PradeepBonde - Stockbee 9M; Enhanced with Jeff Sun's RVOL and Swing Data)
-Purpose: Volume surges (≥5M shares NSE-adapted); integrate RVOL and float % (if added to stored data) for liquidity.
-Data Required to Calculate:
-
-Daily OHLCV (volume).
-50-day avg volume for RVOL ≥1.25.
-Market cap (filter ≥ ₹100 crore).
-Optional: Bulk/block deals.
-
-Data to be Shown:
-
-Ticker, Volume, RVOL, % Change, Float % (if available), Market Cap, Industry/Sector.
-Sorted by volume descending.
-
-4. Relative Strength Leaders ("97 Club" Style, Inspired by @SteveDJacobs; Enhanced with VARS from Jeff Sun)
-Purpose: Top 3% RS; use Volatility-Adjusted RS (VARS: RS / ATR% to normalize for vol).
-Data Required to Calculate:
-
-Historical OHLCV (closes for changes).
-ATR% for VARS adjustment.
-Market cap (filter ≥ ₹100 crore).
-
-Data to be Shown:
-
-Ticker, VARS Day/Week/Month, % Change (1M), Market Cap, Industry/Sector.
-Highlight ≥97; sorted by average VARS.
-
-5. MA Stacked Breakouts (Inspired by @SteveDJacobs Qullamaggie and @FranVezz; Enhanced with VCP and ATR% from 50-MA)
-Purpose: Uptrend breakouts with range ≥50%; add VCP (vol contraction: narrowing ranges pre-breakout) and XxATR% from 50-MA for extensions.
-Data Required to Calculate:
-
-Historical OHLCV for EMA10, SMA20/50/100/200, 20-day range.
-ATR (14-day), ATR% from 50-MA (multiples).
-VCP: Consecutive narrowing (high-low) over 3-5 bars.
-RS ≥97 (1W/1M/3M/6M percentiles).
-Market cap (filter ≥ ₹100 crore).
-
-Data to be Shown:
-
-Ticker, RS (max), ATR% from 50-MA (e.g., 3x), VCP Score (1-5), Price-to-Range, Market Cap, Industry/Sector.
-Sorted by least extension; bold ≥7x.
-
-6. ATR Extension Matrix for Sectors (Inspired by @SteveDJacobs; Enhanced with ADR% Bands)
-Purpose: Sector rotations by extensions; add ADR% for volatility bands.
-Data Required to Calculate:
-
-Historical OHLCV for sectoral indices.
-ATR (14-day), SMA50, ADR% (20-day).
-
-Data to be Shown:
-
-Sector, ATR Extension, ADR%, Weekly % Change, Monthly % Change.
-Sorted by extension descending.
-
-7. Leading Industries/Groups (Inspired by @SteveDJacobs and @FranVezz; Enhanced with VARW for Weakness)
-Purpose: Top 20% strength; add Volatility-Adjusted Relative Weakness (VARW: inverse VARS) for laggards.
-Data Required to Calculate:
-
-Industry/sector mappings.
-OHLCV for group strength (weekly/monthly RS/ADR-adjusted).
-Daily % changes for top 4.
-
-Data to be Shown:
-
-Industry Group, Weekly Strength (VARS %), Monthly Strength, VARW (for laggards), Top 4 Performers (Tickers, % Change).
-Highlight top 20% (green).
-
-8. Stage Analysis Breakdown (Inspired by @SteveDJacobs; Enhanced with LoD ATR Distance)
-Purpose: Stage classification; add LoD distance to ATR (<60% for tight Stage 2 entries, per Jeff Sun).
-Data Required to Calculate:
-
-Historical OHLCV for EMA10, SMA20/50, ATR, Darvas box.
-LoD (daily low) vs. ATR.
-
-Data to be Shown:
-
-% Breakdown by Stage, Counts, Avg LoD ATR %.
-Bar chart + table; highlight tight LoD.
-
-9. Momentum Watchlist (Inspired by @FranVezz and @PradeepBonde; Enhanced with PEAD Proxy via Deals)
-Purpose: RS + MA holds; use bulk/block deals as PEAD proxy (post-event drift).
-
-Data Required to Calculate:
-
-Historical OHLCV for RS, green candles, SMA50 holds.
-Bulk/block deals (catalyst flag).
-Market cap (filter ≥ ₹100 crore).
-
-Data to be Shown:
-
-Ticker, RS (1M), Candle Type, LoD ATR % (<60%), Recent Deal (Yes/No), Industry/Sector.
-Sorted by least extended.
-
-10. Breadth Metrics Dashboard (Inspired by @SteveDJacobs and @PradeepBonde; Enhanced with TradersLab McClellan and Equal-Weighting)
-Purpose: Sentiment via ratios; add McClellan Oscillator/Summation Index (EMA diff of advances/declines) and equal-weighted (per TradersLab image).
-Data Required to Calculate:
-
-Daily/historical OHLCV for universes (Nifty 50/500, Composite).
-SMA20/50/200, new highs/lows.
-Up/down counts (1D/1W/1M); McClellan: 19-day EMA advances - 39-day EMA declines.
-
-Data to be Shown:
-
-Table: Universe (Equal-Weighted), Up/Down Ratio, % Above SMA20/50/200, McClellan Oscillator, New Highs/Lows.
-Stacked bars + line charts (McClellan divergence).
-
-11. RRG Charts for Sectoral Indices (As Requested; Enhanced with ADR% Coloring)
-Purpose: Sector rotation; color points by ADR% (high vol = red tails for risk).
-Data Required to Calculate:
-
-Historical OHLCV for sectors/benchmark (Nifty 50).
-RS-Ratio, RS-Momentum (ROC), smoothed MAs.
-ADR% for coloring.
-
-Data to be Shown:
-
-Scatter: X (RS-Ratio), Y (RS-Momentum), tails (10 weeks), quadrants, ADR% color scale.
-Hover: RS values, % change.
-
-Updated List of Daily Calculated Data Points
-Post-EOD (8-9 PM IST) cron: Compute/store in ClickHouse for screeners. New additions from Jeff Sun/TradersLab: ADR%, VARS/VARW, VCP score, LoD ATR %, McClellan, ORH/M30 proxy.
-
-1. Price Changes: 1D/1W/1M/3M/6M %.
-2. Relative Strength (RS): Percentiles; now VARS (RS / ATR%).
-3. VARW: Inverse VARS for weakness.
-4. Moving Averages: EMA10, SMA20/50/100/200.
-5. ATR (14-day): Wilder from OHLC.
-6. ATR % and RS: (ATR/close * 100), percentile.
-7. ATR % from 50-MA: Multiples (e.g., 3x).
-8. ADR%: Avg (high-low)/close * 100 (20 days).
-9. ATR Extension: ((close / SMA50) - 1) / (ATR/close).
-10. 20-Day Darvas Box: High/low; price-to-range %.
-11. RVOL: Today / 50-day avg volume.
-12. ORH/M30 Re-ORH: Opening range high; 30-min reclaim (proxy if no intraday).
-13. LoD ATR %: (LoD - close) / ATR * 100 (<60% flag).
-14. New 20-Day Highs/Lows: Counts.
-15. Industry/Sector Strength: Equal-weighted VARS %.
-16. RRG Metrics: RS-Ratio, RS-Momentum, ADR% color.
-17. Candle Type: Green/Red % change.
-18. Up/Down Counts: 1D/1W/1M.
-19. McClellan Oscillator/Summation: EMA diff of advances/declines.
-20. VCP Score: Narrowing ranges (1-5 over 3-5 bars).
-21. Stage Classification: 1-4 with LoD flag.
-
-These support all screeners; compute incrementally for efficiency.
+Section 2: Detailed Screener/Scanner Descriptions
+Each screener outputs to Dash (tables/charts). Historical: Store daily results in postgres supabase for trending (e.g., view past RRG rotations), unless noted as snapshot-only.
+1. 4% Daily Breakouts/Gainers
+Purpose: Momentum stocks up ≥4% with volume surge; M30 Re-ORH for confirmation.
+Data Required to Calculate: Daily OHLCV (open, close, volume; prior day vol); market cap.
+Data to be Shown: Table: Ticker, % Change, Volume, RVOL, M30 Re-ORH (Yes/No), Market Cap. Separate +4%/-4% lists, sorted by % Change.
+Historical Storage: Snapshot-only (daily refresh), but retain for breadth trends.
+2. 20% Weekly Moves
+Purpose: Extreme swings for patterns; ADR% for vol context.
+Data Required to Calculate: Historical OHLCV (5-day closes, vol avg); ADR%; market cap.
+Data to be Shown: Table: Ticker, Weekly % Change, Volume Avg, ADR%, Market Cap, Industry/Sector. Separate +20%/-20%, sorted by absolute change.
+Historical Storage: Retain (append daily rolls) for pattern studies over time.
+3. High-Volume Movers
+Purpose: Volume surges; RVOL and float % for liquidity (float from market cap proxy if not stored).
+Data Required to Calculate: Daily OHLCV (volume, 50-day avg); market cap.
+Data to be Shown: Table: Ticker, Volume, RVOL, % Change, Float % (cap-derived), Market Cap, Industry/Sector. Sorted by volume.
+Historical Storage: Snapshot-only, but retain for volume trend analysis.
+4. Relative Strength Leaders ("97 Club" Style)
+Purpose: Top 3% RS; VARS for vol adjustment.
+Data Required to Calculate: Historical OHLCV (changes); ATR% for VARS; market cap.
+Data to be Shown: Table: Ticker, VARS Day/Week/Month, % Change (1M), Market Cap, Industry/Sector. Highlight ≥97; sorted by avg VARS.
+Historical Storage: Retain (daily RS history) for leadership trends.
+5. MA Stacked Breakouts
+Purpose: Uptrend breakouts; VCP and ATR% from 50-MA for extensions.
+Data Required to Calculate: Historical OHLCV (MAs, range, ATR/ATR%); VCP score; RS; market cap.
+Data to be Shown: Table: Ticker, RS (max), ATR% from 50-MA, VCP Score, Price-to-Range, Market Cap, Industry/Sector. Sorted by least extension; bold ≥7x.
+Historical Storage: Retain (VCP needs prior bars) for breakout history.
+6. ATR Extension Matrix for Sectors
+Purpose: Sector rotations; ADR% bands for vol.
+Data Required to Calculate: Historical OHLCV (sector indices: ATR, SMA50, ADR%).
+Data to be Shown: Table: Sector, ATR Extension, ADR%, Weekly % Change, Monthly % Change. Sorted by extension.
+Historical Storage: Retain (extensions over time) for sector trends.
+7. Leading Industries/Groups
+Purpose: Top 20% strength; VARW for laggards.
+Data Required to Calculate: Industry mappings; OHLCV (group VARS %); daily changes.
+Data to be Shown: Table: Group, Weekly VARS %, Monthly VARS, VARW, Top 4 Performers (Tickers, % Change). Highlight top 20%.
+Historical Storage: Retain (strength history) for group rotation.
+8. Stage Analysis Breakdown
+Purpose: Stage classification; LoD ATR % for entries.
+Data Required to Calculate: Historical OHLCV (MAs, ATR, Darvas); LoD ATR %.
+Data to be Shown: Bar Chart + Table: %/Counts by Stage, Avg LoD ATR %. Highlight tight LoD.
+Historical Storage: Retain (daily breakdowns) for market health trends.
+9. Momentum Watchlist
+Purpose: RS + MA holds; PEAD proxy via deals.
+Data Required to Calculate: Historical OHLCV (RS, candles, SMA50); deals; market cap.
+Data to be Shown: Table: Ticker, RS (1M), Candle Type, LoD ATR % (<60%), Recent Deal (Yes/No), Industry/Sector. Sorted by least extended.
+Historical Storage: Snapshot-only, but retain for watchlist evolution.
+10. Breadth Metrics Dashboard
+Purpose: Sentiment ratios; McClellan/equal-weighting from TradersLab.
+Data Required to Calculate: OHLCV (universes: up/down, % above KMAs, highs/lows); McClellan calcs.
+Data to be Shown: Table: Universe (Equal-Weighted), Up/Down Ratio, % Above SMA20/50/200, McClellan Oscillator/Summation, New Highs/Lows. Stacked bars + line charts.
+Historical Storage: Retain (McClellan cumulative) for divergence charts.
+11. RRG Charts for Sectoral Indices
+Purpose: Sector rotation; ADR% coloring for vol risk.
+Data Required to Calculate: Historical OHLCV (sectors/benchmark: RS-Ratio/Momentum, smoothed); ADR%.
+Data to be Shown: Scatter Plot: X (RS-Ratio), Y (RS-Momentum), tails (10 weeks), quadrants, ADR% colors. Hover: RS values, % change.
+Historical Storage: Retain (100+ weeks) for tails/trends.
+This documentation is self-contained for codebase building—start with daily calcs in cron, then screeners in FastAPI/Dash.
