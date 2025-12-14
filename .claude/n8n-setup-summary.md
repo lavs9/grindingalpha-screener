@@ -15,19 +15,23 @@
 
 ### 2. Authentication & Security
 - **UI Authentication:** Basic Auth enabled
-  - Username: `admin`
-  - Password: `ZEwTRrfdQ+rG8A01/cBqyQ==` (stored in `.env`)
+  - Username: Set via `N8N_BASIC_AUTH_USER` in `.env`
+  - Password: Set via `N8N_BASIC_AUTH_PASSWORD` in `.env`
 
 - **API Authentication:** API key generated for programmatic access
-  - API Key: `14bae9852790a601bf822e8eb7146740af7a5f374a824d764215bedbe8846639`
+  - API Key: Set via `N8N_API_KEY` in `.env`
   - Header: `X-N8N-API-KEY`
 
-### 3. Environment Variables Added
+### 3. Environment Variables Required
 ```bash
 # In .env (NOT committed to git)
-N8N_API_KEY=14bae9852790a601bf822e8eb7146740af7a5f374a824d764215bedbe8846639
+# Generate secure values using:
+# API Key: openssl rand -hex 32
+# Password: openssl rand -base64 24
+
+N8N_API_KEY=<generate-with-openssl-rand-hex-32>
 N8N_BASIC_AUTH_USER=admin
-N8N_BASIC_AUTH_PASSWORD=ZEwTRrfdQ+rG8A01/cBqyQ==
+N8N_BASIC_AUTH_PASSWORD=<generate-with-openssl-rand-base64-24>
 
 # Optional (configure later)
 # SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
@@ -50,12 +54,14 @@ Pre-configured for Claude Code integration:
       "args": ["n8n-mcp"],
       "env": {
         "N8N_API_URL": "http://localhost:5678",
-        "N8N_API_KEY": "14bae9852790a601bf822e8eb7146740af7a5f374a824d764215bedbe8846639"
+        "N8N_API_KEY": "<copy-from-your-.env-file>"
       }
     }
   }
 }
 ```
+
+**Note:** Replace `<copy-from-your-.env-file>` with the actual `N8N_API_KEY` value from your `.env` file.
 
 ---
 
@@ -233,11 +239,11 @@ docker-compose logs n8n | grep -i database
 open http://localhost:5678
 
 # Login credentials:
-# Username: admin
-# Password: ZEwTRrfdQ+rG8A01/cBqyQ==
+# Username: Check N8N_BASIC_AUTH_USER in .env
+# Password: Check N8N_BASIC_AUTH_PASSWORD in .env
 
-# Test API access
-curl -H "X-N8N-API-KEY: 14bae9852790a601bf822e8eb7146740af7a5f374a824d764215bedbe8846639" \
+# Test API access (using API key from .env)
+curl -H "X-N8N-API-KEY: $(grep N8N_API_KEY .env | cut -d= -f2)" \
   http://localhost:5678/api/v1/workflows
 ```
 

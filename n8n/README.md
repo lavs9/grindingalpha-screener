@@ -11,8 +11,8 @@ n8n is configured to use PostgreSQL for workflow storage (persistent across cont
 **Access n8n UI:**
 ```bash
 # URL: http://localhost:5678
-# Username: admin
-# Password: ZEwTRrfdQ+rG8A01/cBqyQ==  (from .env: N8N_BASIC_AUTH_PASSWORD)
+# Username: Set in .env as N8N_BASIC_AUTH_USER
+# Password: Set in .env as N8N_BASIC_AUTH_PASSWORD
 ```
 
 ### 2. Enable API Authentication
@@ -21,11 +21,12 @@ n8n API is secured with an API key for webhook and programmatic access.
 
 **API Configuration:**
 - **API URL:** http://localhost:5678
-- **API Key:** `14bae9852790a601bf822e8eb7146740af7a5f374a824d764215bedbe8846639` (from .env: N8N_API_KEY)
+- **API Key:** Set in `.env` as `N8N_API_KEY`
 
 **Test API Access:**
 ```bash
-curl -H "X-N8N-API-KEY: 14bae9852790a601bf822e8eb7146740af7a5f374a824d764215bedbe8846639" \
+# Extract API key from .env and test
+curl -H "X-N8N-API-KEY: $(grep N8N_API_KEY .env | cut -d= -f2)" \
   http://localhost:5678/api/v1/workflows
 ```
 
@@ -44,7 +45,7 @@ Add to your Claude Code settings (`~/.config/Code/User/globalStorage/saoudrizwan
         "LOG_LEVEL": "error",
         "DISABLE_CONSOLE_OUTPUT": "true",
         "N8N_API_URL": "http://localhost:5678",
-        "N8N_API_KEY": "14bae9852790a601bf822e8eb7146740af7a5f374a824d764215bedbe8846639"
+        "N8N_API_KEY": "<copy-from-your-.env-file>"
       }
     }
   }

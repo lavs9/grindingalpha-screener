@@ -8,8 +8,13 @@
         "LOG_LEVEL": "error",
         "DISABLE_CONSOLE_OUTPUT": "true",
         "N8N_API_URL": "http://localhost:5678",
-        "N8N_API_KEY": "14bae9852790a601bf822e8eb7146740af7a5f374a824d764215bedbe8846639"
+        "N8N_API_KEY": "<REPLACE-WITH-VALUE-FROM-.env-FILE>"
       }
     }
   }
 }
+
+NOTE: Before using this configuration:
+1. Copy the N8N_API_KEY value from your .env file
+2. Replace <REPLACE-WITH-VALUE-FROM-.env-FILE> with the actual key
+3. DO NOT commit the modified file with real credentials
