@@ -4,6 +4,8 @@ Resource monitoring utility for tracking CPU, memory, and database usage.
 
 import psutil
 import time
+import asyncio
+import inspect
 from typing import Dict, Optional
 from functools import wraps
 import logging
@@ -67,55 +69,69 @@ class ResourceMonitor:
 
 
 def monitor_resources(operation_name: str):
-    """Decorator to monitor resource usage for a function."""
+    """
+    Decorator to monitor resource usage for both sync and async functions.
+
+    Automatically detects whether the decorated function is async or sync
+    and applies the appropriate wrapper.
+
+    Args:
+        operation_name: Name to identify this operation in logs
+
+    Example:
+        @monitor_resources("Data Ingestion")
+        async def fetch_data():
+            ...
+    """
     def decorator(func):
-        @wraps(func)
-        async def async_wrapper(*args, **kwargs):
-            start_time = time.time()
-            ResourceMonitor.log_resource_usage(f"{operation_name} - START")
+        # Detect if function is async using inspect module
+        is_async = asyncio.iscoroutinefunction(func)
 
-            try:
-                result = await func(*args, **kwargs)
-                duration = time.time() - start_time
-                ResourceMonitor.log_resource_usage(
-                    f"{operation_name} - END",
-                    {"duration_seconds": duration}
-                )
-                return result
-            except Exception as e:
-                duration = time.time() - start_time
-                ResourceMonitor.log_resource_usage(
-                    f"{operation_name} - ERROR",
-                    {"duration_seconds": duration, "error": str(e)}
-                )
-                raise
+        if is_async:
+            @wraps(func)
+            async def async_wrapper(*args, **kwargs):
+                start_time = time.time()
+                ResourceMonitor.log_resource_usage(f"{operation_name} - START")
 
-        @wraps(func)
-        def sync_wrapper(*args, **kwargs):
-            start_time = time.time()
-            ResourceMonitor.log_resource_usage(f"{operation_name} - START")
+                try:
+                    result = await func(*args, **kwargs)
+                    duration = time.time() - start_time
+                    ResourceMonitor.log_resource_usage(
+                        f"{operation_name} - END",
+                        {"duration_seconds": duration}
+                    )
+                    return result
+                except Exception as e:
+                    duration = time.time() - start_time
+                    ResourceMonitor.log_resource_usage(
+                        f"{operation_name} - ERROR",
+                        {"duration_seconds": duration, "error": str(e)}
+                    )
+                    raise
 
-            try:
-                result = func(*args, **kwargs)
-                duration = time.time() - start_time
-                ResourceMonitor.log_resource_usage(
-                    f"{operation_name} - END",
-                    {"duration_seconds": duration}
-                )
-                return result
-            except Exception as e:
-                duration = time.time() - start_time
-                ResourceMonitor.log_resource_usage(
-                    f"{operation_name} - ERROR",
-                    {"duration_seconds": duration, "error": str(e)}
-                )
-                raise
+            return async_wrapper
+        else:
+            @wraps(func)
+            def sync_wrapper(*args, **kwargs):
+                start_time = time.time()
+                ResourceMonitor.log_resource_usage(f"{operation_name} - START")
 
-        # Check if function is async
-        if callable(func) and hasattr(func, '__code__'):
-            if func.__code__.co_flags & 0x100:  # CO_COROUTINE
-                return async_wrapper
+                try:
+                    result = func(*args, **kwargs)
+                    duration = time.time() - start_time
+                    ResourceMonitor.log_resource_usage(
+                        f"{operation_name} - END",
+                        {"duration_seconds": duration}
+                    )
+                    return result
+                except Exception as e:
+                    duration = time.time() - start_time
+                    ResourceMonitor.log_resource_usage(
+                        f"{operation_name} - ERROR",
+                        {"duration_seconds": duration, "error": str(e)}
+                    )
+                    raise
 
-        return sync_wrapper
+            return sync_wrapper
 
     return decorator

@@ -1,0 +1,128 @@
+{
+  "name": "Weekly Industry Classification Scraper",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 22 * * 0"
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Sundays at 10:00 PM IST",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8000/api/v1/ingest/industry-classification",
+        "authentication": "none",
+        "options": {
+          "timeout": 7200000
+        }
+      },
+      "id": "scrape-industry",
+      "name": "Scrape Industry Classification (All Symbols)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.success}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "check-success",
+      "name": "Scraping Successful?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{JSON.stringify({\n  \"workflow\": \"Weekly Industry Classification\",\n  \"timestamp\": $now.toISO(),\n  \"status\": \"success\",\n  \"symbols_processed\": $json.symbols_processed,\n  \"symbols_updated\": $json.symbols_updated,\n  \"symbols_failed\": $json.symbols_failed,\n  \"execution_time_seconds\": Math.round($json.execution_time_ms / 1000),\n  \"errors_summary\": ($json.errors || []).slice(0, 5)\n}, null, 2)}}"
+      },
+      "id": "success-summary",
+      "name": "Success Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{JSON.stringify({\n  \"workflow\": \"Weekly Industry Classification\",\n  \"timestamp\": $now.toISO(),\n  \"status\": \"failed\",\n  \"symbols_processed\": $json.symbols_processed || 0,\n  \"symbols_failed\": $json.symbols_failed || 0,\n  \"error\": $json.error || \"Unknown error\",\n  \"action_required\": \"Check backend logs for Playwright errors\"\n}, null, 2)}}"
+      },
+      "id": "failure-alert",
+      "name": "Failure Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 400]
+    }
+  ],
+  "connections": {
+    "Sundays at 10:00 PM IST": {
+      "main": [
+        [
+          {
+            "node": "Scrape Industry Classification (All Symbols)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scrape Industry Classification (All Symbols)": {
+      "main": [
+        [
+          {
+            "node": "Scraping Successful?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scraping Successful?": {
+      "main": [
+        [
+          {
+            "node": "Success Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Failure Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-12-14T00:00:00.000Z",
+  "versionId": "1"
+}

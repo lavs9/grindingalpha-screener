@@ -16,7 +16,7 @@
       "name": "Daily at 8:30 PM IST (Mon-Fri)",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.1,
-      "position": [240, 300]
+      "position": [240, 400]
     },
     {
       "parameters": {
@@ -28,7 +28,7 @@
       "name": "Check if Trading Day",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [460, 300]
+      "position": [460, 400]
     },
     {
       "parameters": {
@@ -45,7 +45,132 @@
       "name": "Is Trading Day?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [680, 300]
+      "position": [680, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8000/api/v1/ingest/securities",
+        "authentication": "none",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "ingest-securities",
+      "name": "Ingest Securities List",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8000/api/v1/ingest/etf",
+        "authentication": "none",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "ingest-etf",
+      "name": "Ingest ETF List",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8000/api/v1/ingest/market-cap",
+        "authentication": "none",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "ingest-market-cap",
+      "name": "Ingest Market Cap",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 400],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8000/api/v1/ingest/bulk-deals",
+        "authentication": "none",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "ingest-bulk-deals",
+      "name": "Ingest Bulk Deals",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 500],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8000/api/v1/ingest/block-deals",
+        "authentication": "none",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "ingest-block-deals",
+      "name": "Ingest Block Deals",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 600],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8000/api/v1/ingest/surveillance",
+        "authentication": "none",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "ingest-surveillance",
+      "name": "Ingest Surveillance Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 700],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "url": "http://backend:8000/api/v1/status/ingestion",
+        "authentication": "none",
+        "options": {}
+      },
+      "id": "check-ingestion-status",
+      "name": "Check Ingestion Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.sources.nse_securities.status}}",
+              "value2": "success"
+            }
+          ]
+        }
+      },
+      "id": "check-securities-success",
+      "name": "Securities Ingested?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1340, 400]
     },
     {
       "parameters": {
@@ -60,36 +185,19 @@
       "name": "Ingest Daily OHLCV",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [900, 200],
+      "position": [1560, 300],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "http://backend:8000/api/v1/ingest/securities",
-        "authentication": "none",
-        "options": {}
+        "mode": "raw",
+        "jsonOutput": "={{JSON.stringify({\"message\": \"OHLCV skipped - securities ingestion failed\", \"critical_failure\": true}, null, 2)}}"
       },
-      "id": "ingest-securities",
-      "name": "Ingest Securities List",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [900, 300],
-      "continueOnFail": true
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "http://backend:8000/api/v1/ingest/market-cap",
-        "authentication": "none",
-        "options": {}
-      },
-      "id": "ingest-market-cap",
-      "name": "Ingest Market Cap",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [900, 400],
-      "continueOnFail": true
+      "id": "skip-ohlcv",
+      "name": "Skip OHLCV (Missing Dependencies)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 500]
     },
     {
       "parameters": {
@@ -97,22 +205,22 @@
         "authentication": "none",
         "options": {}
       },
-      "id": "check-ingestion-status",
-      "name": "Check Ingestion Status",
+      "id": "final-status-check",
+      "name": "Final Status Check",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1120, 300]
+      "position": [1780, 400]
     },
     {
       "parameters": {
         "mode": "raw",
-        "jsonOutput": "={{JSON.stringify({\n  \"workflow\": \"Daily EOD Data Ingestion\",\n  \"date\": $now.toISO(),\n  \"status\": $json.successful_sources === $json.total_sources ? \"success\" : \"partial\",\n  \"successful\": $json.successful_sources,\n  \"total\": $json.total_sources,\n  \"failed\": $json.failed_sources,\n  \"sources\": $json.sources\n}, null, 2)}}"
+        "jsonOutput": "={{JSON.stringify({\n  \"workflow\": \"Daily EOD Data Ingestion\",\n  \"date\": $now.toISO(),\n  \"status\": Object.values($json.sources).every(s => s.status === 'success') ? \"success\" : \"partial\",\n  \"sources\": $json.sources,\n  \"critical_failure\": $json.sources.nse_securities?.status !== 'success' || $json.sources.upstox_daily?.status !== 'success'\n}, null, 2)}}"
       },
       "id": "format-summary",
       "name": "Format Summary",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1340, 300]
+      "position": [2000, 400]
     }
   ],
   "connections": {
@@ -142,12 +250,12 @@
       "main": [
         [
           {
-            "node": "Ingest Daily OHLCV",
+            "node": "Ingest Securities List",
             "type": "main",
             "index": 0
           },
           {
-            "node": "Ingest Securities List",
+            "node": "Ingest ETF List",
             "type": "main",
             "index": 0
           },
@@ -155,11 +263,26 @@
             "node": "Ingest Market Cap",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "Ingest Bulk Deals",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Ingest Block Deals",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Ingest Surveillance Data",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
     },
-    "Ingest Daily OHLCV": {
+    "Ingest Securities List": {
       "main": [
         [
           {
@@ -170,7 +293,7 @@
         ]
       ]
     },
-    "Ingest Securities List": {
+    "Ingest ETF List": {
       "main": [
         [
           {
@@ -192,7 +315,91 @@
         ]
       ]
     },
+    "Ingest Bulk Deals": {
+      "main": [
+        [
+          {
+            "node": "Check Ingestion Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ingest Block Deals": {
+      "main": [
+        [
+          {
+            "node": "Check Ingestion Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ingest Surveillance Data": {
+      "main": [
+        [
+          {
+            "node": "Check Ingestion Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Check Ingestion Status": {
+      "main": [
+        [
+          {
+            "node": "Securities Ingested?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Securities Ingested?": {
+      "main": [
+        [
+          {
+            "node": "Ingest Daily OHLCV",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip OHLCV (Missing Dependencies)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ingest Daily OHLCV": {
+      "main": [
+        [
+          {
+            "node": "Final Status Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip OHLCV (Missing Dependencies)": {
+      "main": [
+        [
+          {
+            "node": "Final Status Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Final Status Check": {
       "main": [
         [
           {
@@ -211,6 +418,6 @@
   "staticData": null,
   "tags": [],
   "triggerCount": 1,
-  "updatedAt": "2025-12-13T06:00:00.000Z",
-  "versionId": "1"
+  "updatedAt": "2025-12-14T00:00:00.000Z",
+  "versionId": "2"
 }

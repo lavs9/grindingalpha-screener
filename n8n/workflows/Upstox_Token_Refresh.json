@@ -1,0 +1,214 @@
+{
+  "name": "Upstox Token Refresh",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Daily at 8:00 AM IST (Mon-Fri)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://backend:8000/api/v1/auth/upstox/token-status",
+        "authentication": "none",
+        "options": {}
+      },
+      "id": "check-token-status",
+      "name": "Check Token Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.is_valid}}",
+              "value2": false
+            }
+          ]
+        }
+      },
+      "id": "is-token-expired",
+      "name": "Token Expired?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8000/api/v1/auth/upstox/login",
+        "authentication": "none",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "mobile",
+              "value": "={{$env.UPSTOX_MOBILE}}"
+            },
+            {
+              "name": "pin",
+              "value": "={{$env.UPSTOX_PIN}}"
+            },
+            {
+              "name": "totp_secret",
+              "value": "={{$env.UPSTOX_TOTP_SECRET}}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "refresh-token",
+      "name": "Refresh Token via Playwright",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{JSON.stringify({\"message\": \"Token refresh skipped - token still valid\", \"expires_at\": $json.expires_at}, null, 2)}}"
+      },
+      "id": "skip-refresh",
+      "name": "Skip Refresh (Token Valid)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.success}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "check-refresh-success",
+      "name": "Refresh Successful?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{JSON.stringify({\n  \"workflow\": \"Upstox Token Refresh\",\n  \"timestamp\": $now.toISO(),\n  \"status\": \"success\",\n  \"token_expires_at\": $json.expires_at,\n  \"message\": \"Token refreshed successfully\"\n}, null, 2)}}"
+      },
+      "id": "success-summary",
+      "name": "Success Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 100]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{JSON.stringify({\n  \"workflow\": \"Upstox Token Refresh\",\n  \"timestamp\": $now.toISO(),\n  \"status\": \"failed\",\n  \"error\": $json.error || \"Token refresh failed\",\n  \"action_required\": \"Manual token refresh needed - check backend logs\"\n}, null, 2)}}"
+      },
+      "id": "failure-alert",
+      "name": "Failure Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 300]
+    }
+  ],
+  "connections": {
+    "Daily at 8:00 AM IST (Mon-Fri)": {
+      "main": [
+        [
+          {
+            "node": "Check Token Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Token Status": {
+      "main": [
+        [
+          {
+            "node": "Token Expired?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Token Expired?": {
+      "main": [
+        [
+          {
+            "node": "Refresh Token via Playwright",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip Refresh (Token Valid)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refresh Token via Playwright": {
+      "main": [
+        [
+          {
+            "node": "Refresh Successful?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refresh Successful?": {
+      "main": [
+        [
+          {
+            "node": "Success Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Failure Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-12-14T00:00:00.000Z",
+  "versionId": "1"
+}

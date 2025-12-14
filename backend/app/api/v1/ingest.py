@@ -770,7 +770,7 @@ async def ingest_historical_ohlcv(
 
 
 @router.post("/historical-ohlcv-batch")
-# @monitor_resources("Historical OHLCV Batch Ingestion")  # TODO: Fix async compatibility
+@monitor_resources("Historical OHLCV Batch Ingestion")
 async def ingest_historical_ohlcv_batch(
     symbols: Optional[List[str]] = Query(None, description="Optional list of symbols. If not provided, processes all active securities"),
     start_date: Optional[date] = Query(None, description="Start date (default: 5 years ago)"),
@@ -859,7 +859,7 @@ async def ingest_historical_ohlcv_batch(
 
 
 @router.post("/daily-ohlcv")
-# @monitor_resources("Daily OHLCV Ingestion")  # TODO: Fix async compatibility
+@monitor_resources("Daily OHLCV Ingestion")
 async def ingest_daily_ohlcv(
     symbols: Optional[List[str]] = Query(None, description="Optional list of symbols. If not provided, processes all active securities"),
     target_date: Optional[date] = Query(None, description="Target date (default: yesterday)"),

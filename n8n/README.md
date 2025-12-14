@@ -74,28 +74,50 @@ docker-compose logs n8n | grep -i database
 
 ---
 
-## Workflow Implementation Plan
+## Available Workflows
 
 See [.claude/n8n-workflows-plan.md](../.claude/n8n-workflows-plan.md) for detailed specifications.
 
-### Workflows to Implement
+### Implemented Workflows (Phase 1.5)
 
-1. **Daily EOD Master Workflow** (Priority 1)
-   - Schedule: Every weekday at 9:00 PM IST
-   - 6 parallel branches: Securities, ETFs, Market Cap, Bulk Deals, Block Deals, Surveillance
-   - 1 dependent branch: Upstox Daily OHLCV (runs after securities update)
+All workflows are available in `n8n/workflows/` directory as JSON files.
 
-2. **Upstox Token Refresh Workflow** (Priority 1)
-   - Schedule: Every day at 8:00 AM IST
-   - Checks token expiry and refreshes if needed
+1. **✅ Daily EOD Data Ingestion** (`Daily_EOD_Data_Ingestion.json`)
+   - **Schedule:** Every weekday at 8:30 PM IST (Mon-Fri)
+   - **6 parallel branches:** Securities, ETFs, Market Cap, Bulk Deals, Block Deals, Surveillance
+   - **1 dependent branch:** Upstox Daily OHLCV (runs after securities validation)
+   - **Features:**
+     - Trading day check via `/api/v1/status/is-trading-day`
+     - Independent parallel execution (failures don't block other branches)
+     - Database-driven aggregation via `ingestion_logs` table
+     - Conditional OHLCV fetch (only if securities ingestion succeeded)
+     - Final status summary with critical failure detection
 
-3. **Weekly Industry Classification Scraper**
-   - Schedule: Every Sunday at 10:00 AM IST
-   - Uses Playwright to scrape NSE website
+2. **✅ Upstox Token Refresh** (`Upstox_Token_Refresh.json`)
+   - **Schedule:** Every day at 8:00 AM IST (Mon-Fri)
+   - **Features:**
+     - Checks token expiry via `/api/v1/auth/upstox/token-status`
+     - Automatic refresh via Playwright if expired
+     - Success/failure notifications
+     - Skips refresh if token is still valid
 
-4. **Historical OHLCV Backfill Workflow**
-   - Trigger: Manual/Webhook only
-   - Fetches 5 years of data for all 2000+ securities
+3. **✅ Weekly Industry Classification Scraper** (`Weekly_Industry_Classification.json`)
+   - **Schedule:** Every Sunday at 10:00 PM IST
+   - **Features:**
+     - Scrapes all 2000+ symbols via NSE Quote Equity API
+     - Playwright browser automation with cookie management
+     - Rate limiting (1 request/second)
+     - Timeout: 2 hours (for full scrape)
+
+4. **✅ Historical Backfill OHLCV** (`Historical_Backfill_OHLCV.json`)
+   - **Trigger:** Manual execution only
+   - **Features:**
+     - Fetches 5 years of historical OHLCV data
+     - Batch processing (50 symbols per batch)
+     - Timeout: 1 hour
+     - Progress tracking via `ingestion_logs`
+
+### Workflows to Implement (Future)
 
 5. **Upstox Instrument Refresh Workflow**
    - Schedule: Every Saturday at 11:00 PM IST
