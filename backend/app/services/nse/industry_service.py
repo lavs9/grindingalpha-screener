@@ -307,7 +307,12 @@ async def scrape_all_securities(
 
     except Exception as e:
         db.rollback()
-        result["errors"].append(f"Fatal error: {str(e)}")
+        import traceback
+        error_msg = f"Fatal error: {str(e)}"
+        traceback_str = traceback.format_exc()
+        print(f"ERROR: {error_msg}")
+        print(f"TRACEBACK:\n{traceback_str}")
+        result["errors"].append(error_msg)
         result["success"] = False
 
     finally:
@@ -447,7 +452,7 @@ def ensure_indices_exist(db: Session, index_names: List[str]):
 
     # Get existing index names
     existing = db.query(Index.index_name).filter(Index.index_name.in_(index_names)).all()
-    existing_names = {row.name for row in existing}
+    existing_names = {row.index_name for row in existing}
 
     # Insert missing indices
     missing_names = set(index_names) - existing_names
