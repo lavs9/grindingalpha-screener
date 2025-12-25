@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 from app.core.config import settings
 from app.core.logging_config import setup_logging
-from app.api.v1 import health, ingest, auth, status
+from app.api.v1 import health, ingest, auth, status, metrics, screeners
 from app.database.session import engine
 from app.database.base import Base
 
@@ -47,6 +47,8 @@ app.include_router(health.router, prefix="/api/v1", tags=["Health"])
 app.include_router(status.router, prefix="/api/v1/status", tags=["Status & Monitoring"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(ingest.router, prefix="/api/v1/ingest", tags=["Data Ingestion"])
+app.include_router(metrics.router, prefix="/api/v1/metrics", tags=["Metrics Calculation"])
+app.include_router(screeners.router, prefix="/api/v1/screeners", tags=["Stock Screeners"])
 
 
 @app.on_event("startup")

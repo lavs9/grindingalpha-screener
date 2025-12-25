@@ -174,6 +174,10 @@ def parse_industry_classification(quote_data: Dict, symbol: str) -> Optional[Dic
     """
     industry_info = quote_data.get("industryInfo")
     if not industry_info:
+        # Debug: Log first few symbols to see what NSE returns
+        import random
+        if random.random() < 0.01:  # Log ~1% of symbols
+            print(f"DEBUG: No industryInfo for {symbol}. Keys in quote_data: {list(quote_data.keys())}")
         return None
 
     return {
