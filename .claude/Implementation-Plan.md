@@ -1808,25 +1808,66 @@ Create `RUNBOOK.md`:
 
 ---
 
-## Post-Phase 1: Next Steps (Phase 2 Preview)
+## Phase 2: Backend Screeners Implementation (Est. 6 weeks)
 
-**Phase 2: Calculation Engine (Est. 4-6 weeks)**
+**Objective:** Build backend calculation engine and 11 screener API endpoints using existing PostgreSQL database.
 
-### 2.1 Daily Metrics Calculation
-- Implement calculation service for 30+ technical indicators
-- Schedule post-EOD (after daily OHLCV ingestion)
-- Store in `calculated_metrics` table
+**📖 Detailed Plan:** [.claude/plans/phase-2-backend-screeners.md](.claude/plans/phase-2-backend-screeners.md)
 
-### 2.2 Screener Implementation
-- Start with RRG Charts (priority #1)
-- Implement remaining 10 screeners one by one
-- Create screener API endpoints
-- Build frontend dashboard (optional)
+**Key Deliverables:**
+- 40+ calculated technical metrics (VARS, ATR%, VCP Score, Stage Classification, etc.)
+- 11 screener API endpoints (RRG Charts, 4% Breakouts, RS Leaders, etc.)
+- Daily metrics calculation workflow (n8n automation)
+- Performance optimization (<5 min for 2000 securities)
 
-### 2.3 Performance Optimization
-- Evaluate PostgreSQL performance with full dataset
-- Consider ClickHouse migration if needed
-- Implement caching (Redis) for frequently accessed data
+**Success Criteria:**
+- All 11 screener endpoints functional and returning accurate data
+- Metrics calculation automated and running daily
+- Screener queries complete in <2 seconds
+- All endpoints tested via Swagger UI
+
+---
+
+## Phase 3: Frontend Dashboard (Est. 5 weeks)
+
+**Objective:** Build user-facing web dashboard for screener visualization and interaction.
+
+**📖 Detailed Plans:**
+- **Technical Specifications:** [.claude/plans/phase-3-frontend-technical-specs.md](.claude/plans/phase-3-frontend-technical-specs.md) (67 pages - complete architecture, database schemas, code examples)
+- **Execution Roadmap:** [.claude/plans/implementation-roadmap-phases-2-3.md](.claude/plans/implementation-roadmap-phases-2-3.md) (day-by-day implementation timeline)
+
+**Tech Stack:**
+- Next.js 14+ (App Router) + TypeScript
+- Shadcn/ui components + TanStack Table
+- TradingView Lightweight Charts + Plotly.js
+- Supabase Auth (email OTP, Google, GitHub)
+- Vercel deployment
+
+**Key Deliverables:**
+- Authentication system (3 OAuth providers)
+- 11 screener pages with real backend data integration
+- Customizable dashboard with drag-and-drop widgets
+- Interactive charts (RRG scatter plots, OHLCV candlesticks, heatmaps)
+- Responsive design (desktop-first)
+
+**Success Criteria:**
+- All screener pages loading with real data
+- Authentication working across all providers
+- Dashboard widgets customizable and persistent
+- Lighthouse score >90 (Performance, Accessibility)
+- Production deployment live on Vercel
+
+---
+
+## Post-Phase 3: Advanced Features (Future)
+
+**Potential Enhancements:**
+- Real-time WebSocket updates during market hours
+- Backtesting framework for screener performance
+- Email alerts for screener hits
+- Custom screener builder (user-defined filters)
+- CSV/PDF export with formatting
+- Performance optimization (ClickHouse migration if >10M records)
 
 ---
 

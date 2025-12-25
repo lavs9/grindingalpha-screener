@@ -341,7 +341,35 @@ cp .env.example .env
 docker-compose up -d
 ```
 
-### Frontend Development (Phase 2)
+### Backend Screeners Development (Phase 2)
+
+**Start backend with hot reload:**
+```bash
+cd backend
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+**Calculate metrics manually:**
+```bash
+# Via API endpoint
+curl -X POST "http://localhost:8000/api/v1/metrics/calculate-daily"
+
+# Or via n8n UI (after Phase 1.5 workflows deployed)
+# Open http://localhost:5678, execute "Daily_Metrics_Calculation" workflow
+```
+
+**Access screener endpoints:**
+```bash
+# Example: RRG Charts
+curl -X POST "http://localhost:8000/api/v1/screeners/rrg"
+
+# Example: 4% Breakouts with filters
+curl -X POST "http://localhost:8000/api/v1/screeners/breakouts-4percent?min_change=4.0&min_rvol=1.5"
+
+# See all endpoints at http://localhost:8000/docs
+```
+
+### Frontend Development (Phase 3)
 
 **Local development:**
 ```bash
@@ -362,22 +390,13 @@ npm run build
 npm run start  # Production server
 ```
 
-**Docker development (alternative):**
-```bash
-# Start frontend in dev mode with hot reload
-docker-compose up frontend
-
-# Or start all services
-docker-compose up -d
-```
-
 **Shadcn components (add as needed):**
 ```bash
 cd frontend
 npx shadcn@latest add button
 npx shadcn@latest add data-table
 npx shadcn@latest add dialog
-# See .claude/plans/starry-jingling-phoenix.md for full list
+# See .claude/plans/phase-3-frontend-technical-specs.md for full list
 ```
 
 ## Architecture Highlights
@@ -563,28 +582,46 @@ def test_equity_parser():
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** - Coding standards, development practices, and contribution guidelines (READ THIS FIRST before writing code)
 - **[.claude/PRD.md](.claude/PRD.md)** - Complete product requirements (objectives, scope, user stories)
 - **[.claude/Architecture.md](.claude/Architecture.md)** - System architecture (database schema, n8n workflows, Docker setup)
-- **[.claude/Implementation-Plan.md](.claude/Implementation-Plan.md)** - Phased implementation plan (6-8 weeks, detailed tasks)
+- **[.claude/Implementation-Plan.md](.claude/Implementation-Plan.md)** - Master implementation plan (Phases 1-3 overview with links to detailed plans)
 - **[.claude/file-formats.md](.claude/file-formats.md)** - Data source format specifications (MUST reference before parsing)
 - **[.claude/UPDATES.md](.claude/UPDATES.md)** - Summary of design decisions and changes
-- **[.claude/plans/starry-jingling-phoenix.md](.claude/plans/starry-jingling-phoenix.md)** - Frontend implementation roadmap (day-by-day execution plan, 6 weeks)
-- **[.claude/plans/wise-yawning-candle.md](.claude/plans/wise-yawning-candle.md)** - Frontend technical specifications (complete architecture, code examples, 67 pages)
 - **[documentation/screeners-idea.md](documentation/screeners-idea.md)** - All 11 screener specifications
+
+**Phase-Specific Plans:**
+- **[.claude/plans/phase-2-backend-screeners.md](.claude/plans/phase-2-backend-screeners.md)** - Phase 2 detailed plan (6 weeks, backend screeners implementation)
+- **[.claude/plans/phase-3-frontend-technical-specs.md](.claude/plans/phase-3-frontend-technical-specs.md)** - Phase 3 technical specifications (67 pages - frontend architecture, database schemas, code examples)
+- **[.claude/plans/implementation-roadmap-phases-2-3.md](.claude/plans/implementation-roadmap-phases-2-3.md)** - Phase 2-3 execution roadmap (day-by-day timeline)
 
 ## Current Development Status
 
 **Last Updated:** 2025-12-25
 
-**Current Phase:** Phase 2 - Frontend Development (Planning Complete) 📋
+**Current Phase:** Phase 2 - Backend Screeners (Planning Complete) 📋
 
 **Completed Phases:**
 - ✅ **Phase 0:** Docker Compose environment setup (November 29, 2025)
 - ✅ **Phase 0.6:** PostgreSQL 17 + Resource Monitoring Setup (December 12, 2025)
-- ✅ **Phase 1.1:** Database models and migrations (14 tables: 11 core + 3 Upstox)
-- ✅ **Phase 1.2:** NSE data ingestion (securities, ETFs, market cap, bulk/block deals, surveillance)
-- ✅ **Phase 1.3:** Upstox authentication, instrument mapping, and API integration
-- ✅ **Phase 1.4:** NSE Industry Classification scraping
-- ✅ **Phase 1.5:** n8n Workflows (4 workflows: Daily EOD, Token Refresh, Weekly Industry, Historical Backfill)
-- ✅ **Phase 1.6:** OHLCV Ingestion, Data Quality Monitoring & Structured Logging (December 14, 2025)
+- ✅ **Phase 1:** Data Storage & Infrastructure (Complete)
+  - ✅ **Phase 1.1:** Database models and migrations (14 tables: 11 core + 3 Upstox)
+  - ✅ **Phase 1.2:** NSE data ingestion (securities, ETFs, market cap, bulk/block deals, surveillance)
+  - ✅ **Phase 1.3:** Upstox authentication, instrument mapping, and API integration
+  - ✅ **Phase 1.4:** NSE Industry Classification scraping
+  - ✅ **Phase 1.5:** n8n Workflows (4 workflows: Daily EOD, Token Refresh, Weekly Industry, Historical Backfill)
+  - ✅ **Phase 1.6:** OHLCV Ingestion, Data Quality Monitoring & Structured Logging (December 14, 2025)
+
+**Planned Phases:**
+- 📋 **Phase 2:** Backend Screeners (6 weeks)
+  - 40+ calculated technical metrics (VARS, ATR%, VCP, Stage Analysis)
+  - 11 screener API endpoints (RRG Charts, 4% Breakouts, RS Leaders, etc.)
+  - Daily metrics calculation automation
+  - See [.claude/plans/phase-2-backend-screeners.md](.claude/plans/phase-2-backend-screeners.md)
+
+- 🔜 **Phase 3:** Frontend Dashboard (5 weeks)
+  - Next.js + Shadcn/ui + TanStack Table
+  - Supabase authentication (email OTP, Google, GitHub)
+  - 11 screener pages with interactive charts
+  - Customizable dashboard widgets
+  - See [.claude/plans/phase-3-frontend-technical-specs.md](.claude/plans/phase-3-frontend-technical-specs.md)
 
 **Recent Changes (Phase 1.6 - Completed December 14, 2025):**
 
@@ -644,9 +681,11 @@ def test_equity_parser():
   - TradingView Lightweight Charts (OHLCV)
   - Plotly.js (RRG charts, heatmaps)
   - Vercel deployment + Docker local dev
-  - See [frontend execution plan](.claude/plans/starry-jingling-phoenix.md) for day-by-day roadmap
+  - See [Phase 3 technical specs](.claude/plans/phase-3-frontend-technical-specs.md) for complete architecture
 
-**Future Phases:**
-- **Phase 3:** Backend screener calculations (30+ metrics: VARS, ATR%, VCP, McClellan, etc.)
-- **Phase 4:** Real-time features (WebSocket, live quotes, price alerts)
-- **Phase 5:** Advanced features (CSV export, mobile app, i18n)
+**Next Steps - Phase 2:**
+- Implement `calculated_metrics` table schema (40+ metric columns)
+- Build `DailyMetricsCalculator` service (pandas/NumPy calculations)
+- Create 11 screener API endpoints starting with RRG Charts
+- Set up daily metrics calculation n8n workflow
+- See detailed plan: [.claude/plans/phase-2-backend-screeners.md](.claude/plans/phase-2-backend-screeners.md)
