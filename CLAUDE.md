@@ -41,7 +41,7 @@ This is an Indian stock market screener platform that aggregates data from NSE (
 │       ├── historical_backfill.json
 │       └── weekly_industry_scraper.json
 │
-├── frontend/                   # Dashboard (Phase 3)
+├── frontend/                   # Next.js + Shadcn/ui dashboard (Phase 2 - In Planning)
 ├── scripts/                    # Database & deployment scripts
 ├── logs/                       # Application logs (gitignored)
 └── documentation/             # Screener specifications
@@ -335,9 +335,49 @@ cp .env.example .env
 # - Database password
 # - Upstox API key/secret/token
 # - n8n encryption key
+# - Supabase URL and Anon Key (Phase 2)
 
 # Start services
 docker-compose up -d
+```
+
+### Frontend Development (Phase 2)
+
+**Local development:**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+**Access points:**
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- Supabase Dashboard: https://[project-id].supabase.co
+
+**Build for production:**
+```bash
+cd frontend
+npm run build
+npm run start  # Production server
+```
+
+**Docker development (alternative):**
+```bash
+# Start frontend in dev mode with hot reload
+docker-compose up frontend
+
+# Or start all services
+docker-compose up -d
+```
+
+**Shadcn components (add as needed):**
+```bash
+cd frontend
+npx shadcn@latest add button
+npx shadcn@latest add data-table
+npx shadcn@latest add dialog
+# See .claude/plans/starry-jingling-phoenix.md for full list
 ```
 
 ## Architecture Highlights
@@ -526,13 +566,15 @@ def test_equity_parser():
 - **[.claude/Implementation-Plan.md](.claude/Implementation-Plan.md)** - Phased implementation plan (6-8 weeks, detailed tasks)
 - **[.claude/file-formats.md](.claude/file-formats.md)** - Data source format specifications (MUST reference before parsing)
 - **[.claude/UPDATES.md](.claude/UPDATES.md)** - Summary of design decisions and changes
+- **[.claude/plans/starry-jingling-phoenix.md](.claude/plans/starry-jingling-phoenix.md)** - Frontend implementation roadmap (day-by-day execution plan, 6 weeks)
+- **[.claude/plans/wise-yawning-candle.md](.claude/plans/wise-yawning-candle.md)** - Frontend technical specifications (complete architecture, code examples, 67 pages)
 - **[documentation/screeners-idea.md](documentation/screeners-idea.md)** - All 11 screener specifications
 
 ## Current Development Status
 
-**Last Updated:** 2025-12-14
+**Last Updated:** 2025-12-25
 
-**Current Phase:** Phase 1 COMPLETED ✅
+**Current Phase:** Phase 2 - Frontend Development (Planning Complete) 📋
 
 **Completed Phases:**
 - ✅ **Phase 0:** Docker Compose environment setup (November 29, 2025)
@@ -593,7 +635,18 @@ def test_equity_parser():
 - Integrated logging in main.py (startup/shutdown events)
 - Added `logs/` directory to .gitignore
 
-**Next Steps - Phase 2:**
-- Implement 11 screeners (RRG Charts priority)
-- Calculate 30+ daily metrics (VARS, ATR%, VCP, McClellan, etc.)
-- Frontend dashboard (React + Chart.js)
+**Next Steps - Phase 2 (Frontend):**
+- 📋 **Phase 2.0-2.8:** Frontend implementation (6 weeks)
+  - Next.js 14+ with Shadcn/ui components
+  - Supabase authentication (email OTP, Google, GitHub)
+  - 11 screener pages with data tables and charts
+  - Customizable dashboard with React Grid Layout
+  - TradingView Lightweight Charts (OHLCV)
+  - Plotly.js (RRG charts, heatmaps)
+  - Vercel deployment + Docker local dev
+  - See [frontend execution plan](.claude/plans/starry-jingling-phoenix.md) for day-by-day roadmap
+
+**Future Phases:**
+- **Phase 3:** Backend screener calculations (30+ metrics: VARS, ATR%, VCP, McClellan, etc.)
+- **Phase 4:** Real-time features (WebSocket, live quotes, price alerts)
+- **Phase 5:** Advanced features (CSV export, mobile app, i18n)
