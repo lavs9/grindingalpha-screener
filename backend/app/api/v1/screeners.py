@@ -10,7 +10,7 @@ from typing import Optional, List
 from datetime import date, timedelta
 
 from app.database.session import get_db
-from app.models.timeseries import CalculatedMetrics, OHLCVDaily
+from app.models.timeseries import CalculatedMetrics, OHLCVDaily, IndexOHLCVDaily
 from app.models.security import Security
 from app.models.metadata import IndustryClassification
 
@@ -794,13 +794,14 @@ async def get_leading_industries(
 @router.get("/rrg-charts")
 async def get_rrg_charts(
     target_date: Optional[date] = Query(None, description="Date to analyze (default: latest available)"),
-    benchmark: str = Query("NIFTY 50", description="Benchmark index (default: NIFTY 50)"),
+    benchmark: str = Query("NIFTY", description="Benchmark index symbol (default: NIFTY)"),
+    lookback_days: int = Query(5, description="Lookback period for RS-Momentum calculation (default: 5 trading days)"),
     db: Session = Depends(get_db)
 ):
     """
     **Screener #10: RRG Charts for Sectoral Indices**
 
-    Relative Rotation Graph data for sector/industry analysis vs. benchmark.
+    Relative Rotation Graph data for sectoral indices (NIFTY BANK, NIFTY IT, etc.) vs. benchmark.
 
     **RRG Quadrants:**
     - Leading: RS-Ratio > 100, RS-Momentum > 100 (strong & improving)
@@ -809,79 +810,130 @@ async def get_rrg_charts(
     - Improving: RS-Ratio < 100, RS-Momentum > 100 (weak but strengthening)
 
     **Metrics:**
-    - RS-Ratio: (sector close / benchmark close) * 100
-    - RS-Momentum: 1-week ROC of RS-Ratio (smoothed)
+    - RS-Ratio: (index_close / benchmark_close) / (index_close_start / benchmark_close_start) * 100
+    - RS-Momentum: Weekly rate of change of RS-Ratio
 
     **Use Case:**
     Visualize sector rotation and identify sectors moving into leading quadrant.
+    Essential for sector rotation strategies.
+
+    **Query Parameters:**
+    - target_date: Date to analyze (default: latest)
+    - benchmark: Benchmark symbol like "NIFTY" or "NIFTY 500" (default: NIFTY)
+    - lookback_days: Period for momentum calculation (default: 5 trading days)
 
     **Returns:**
-    RRG coordinates for all industries/sectors.
+    RRG coordinates for all sectoral indices with quadrant classification.
     """
     # Default to latest available date
     if target_date is None:
-        latest = db.query(func.max(CalculatedMetrics.date)).scalar()
+        latest = db.query(func.max(IndexOHLCVDaily.date)).scalar()
         if not latest:
-            raise HTTPException(status_code=404, detail="No metrics data available")
+            raise HTTPException(status_code=404, detail="No index data available")
         target_date = latest
 
-    # Get benchmark close price (using NIFTY 50 index from OHLCV)
-    benchmark_data = db.query(OHLCVDaily.close).filter(
+    # Get benchmark data for target date and lookback period
+    benchmark_current = db.query(IndexOHLCVDaily.close).filter(
         and_(
-            OHLCVDaily.symbol == benchmark,
-            OHLCVDaily.date == target_date
+            IndexOHLCVDaily.symbol == benchmark,
+            IndexOHLCVDaily.date == target_date
         )
-    ).first()
+    ).scalar()
 
-    if not benchmark_data:
+    if not benchmark_current:
         raise HTTPException(
             status_code=404,
             detail=f"No benchmark data found for {benchmark} on {target_date}"
         )
 
-    benchmark_close = float(benchmark_data.close)
-
-    # Get industry-level RRG metrics
-    industry_rrg = db.query(
-        IndustryClassification.industry,
-        IndustryClassification.sector,
-        func.avg(CalculatedMetrics.rs_ratio).label('avg_rs_ratio'),
-        func.avg(CalculatedMetrics.rs_momentum).label('avg_rs_momentum'),
-        func.avg(CalculatedMetrics.change_1w_percent).label('avg_weekly_change'),
-        func.count(CalculatedMetrics.id).label('stock_count')
-    ).join(
-        CalculatedMetrics, CalculatedMetrics.symbol == IndustryClassification.symbol
+    # Get benchmark data from lookback_days ago
+    benchmark_historical = db.query(
+        IndexOHLCVDaily.close
     ).filter(
-        CalculatedMetrics.date == target_date
-    ).group_by(
-        IndustryClassification.industry,
-        IndustryClassification.sector
-    ).all()
+        and_(
+            IndexOHLCVDaily.symbol == benchmark,
+            IndexOHLCVDaily.date < target_date
+        )
+    ).order_by(IndexOHLCVDaily.date.desc()).limit(lookback_days).all()
 
-    # Classify into RRG quadrants
+    if len(benchmark_historical) < lookback_days:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Insufficient historical data for benchmark. Need {lookback_days} days, found {len(benchmark_historical)}"
+        )
+
+    benchmark_start = float(benchmark_historical[lookback_days - 1].close)
+    benchmark_current = float(benchmark_current)
+
+    # Get all sectoral indices (exclude benchmark and non-sectoral indices)
+    excluded_symbols = [benchmark, 'India VIX']  # Add more if needed
+    sectoral_indices = db.query(IndexOHLCVDaily.symbol).filter(
+        and_(
+            IndexOHLCVDaily.date == target_date,
+            ~IndexOHLCVDaily.symbol.in_(excluded_symbols)
+        )
+    ).distinct().all()
+
     sectors = []
-    for row in industry_rrg:
-        rs_ratio = float(row.avg_rs_ratio) if row.avg_rs_ratio else 100.0
-        rs_momentum = float(row.avg_rs_momentum) if row.avg_rs_momentum else 100.0
+    for (symbol,) in sectoral_indices:
+        # Get current close
+        current_data = db.query(IndexOHLCVDaily.close).filter(
+            and_(
+                IndexOHLCVDaily.symbol == symbol,
+                IndexOHLCVDaily.date == target_date
+            )
+        ).scalar()
+
+        if not current_data:
+            continue
+
+        # Get historical close (lookback_days ago)
+        historical_data = db.query(
+            IndexOHLCVDaily.close
+        ).filter(
+            and_(
+                IndexOHLCVDaily.symbol == symbol,
+                IndexOHLCVDaily.date < target_date
+            )
+        ).order_by(IndexOHLCVDaily.date.desc()).limit(lookback_days).all()
+
+        if len(historical_data) < lookback_days:
+            continue
+
+        index_current = float(current_data)
+        index_start = float(historical_data[lookback_days - 1].close)
+
+        # Calculate RRG metrics
+        # RS-Ratio = (index/benchmark) normalized to 100
+        rs_ratio_current = (index_current / benchmark_current) * 100
+        rs_ratio_start = (index_start / benchmark_start) * 100
+
+        # Normalize RS-Ratio to 100 baseline
+        rs_ratio = (rs_ratio_current / rs_ratio_start) * 100 if rs_ratio_start > 0 else 100.0
+
+        # RS-Momentum = ROC of RS-Ratio over lookback period
+        rs_momentum = ((rs_ratio_current - rs_ratio_start) / rs_ratio_start * 100) if rs_ratio_start > 0 else 0.0
 
         # Determine quadrant
-        if rs_ratio > 100 and rs_momentum > 100:
+        if rs_ratio > 100 and rs_momentum > 0:
             quadrant = "Leading"
-        elif rs_ratio > 100 and rs_momentum <= 100:
+        elif rs_ratio > 100 and rs_momentum <= 0:
             quadrant = "Weakening"
-        elif rs_ratio <= 100 and rs_momentum <= 100:
+        elif rs_ratio <= 100 and rs_momentum <= 0:
             quadrant = "Lagging"
-        else:  # rs_ratio <= 100 and rs_momentum > 100
+        else:  # rs_ratio <= 100 and rs_momentum > 0
             quadrant = "Improving"
 
+        # Calculate weekly % change for the index itself
+        weekly_change = ((index_current - index_start) / index_start * 100) if index_start > 0 else 0.0
+
         sectors.append({
-            "industry": row.industry,
-            "sector": row.sector,
-            "rs_ratio": rs_ratio,
-            "rs_momentum": rs_momentum,
+            "index_symbol": symbol,
+            "rs_ratio": round(rs_ratio, 2),
+            "rs_momentum": round(rs_momentum, 2),
             "quadrant": quadrant,
-            "avg_weekly_change_percent": float(row.avg_weekly_change) if row.avg_weekly_change else None,
-            "stock_count": row.stock_count
+            "weekly_change_percent": round(weekly_change, 2),
+            "current_close": round(index_current, 2)
         })
 
     # Sort by RS-Ratio (strongest first)
@@ -891,7 +943,14 @@ async def get_rrg_charts(
         "screener": "RRG Charts for Sectoral Indices",
         "date": str(target_date),
         "benchmark": benchmark,
-        "benchmark_close": benchmark_close,
+        "benchmark_close": round(benchmark_current, 2),
+        "lookback_days": lookback_days,
         "count": len(sectors),
+        "quadrant_counts": {
+            "Leading": sum(1 for s in sectors if s['quadrant'] == 'Leading'),
+            "Weakening": sum(1 for s in sectors if s['quadrant'] == 'Weakening'),
+            "Lagging": sum(1 for s in sectors if s['quadrant'] == 'Lagging'),
+            "Improving": sum(1 for s in sectors if s['quadrant'] == 'Improving')
+        },
         "results": sectors
     }
