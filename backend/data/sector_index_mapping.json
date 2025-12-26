@@ -1,0 +1,328 @@
+{
+  "sectoral_indices": {
+    "NIFTY AUTO": {
+      "category": "Auto",
+      "type": "Sectoral",
+      "display_name": "Nifty Auto"
+    },
+    "BANKNIFTY": {
+      "category": "Banking",
+      "type": "Sectoral",
+      "display_name": "Nifty Bank"
+    },
+    "NIFTY CHEMICALS": {
+      "category": "Chemicals",
+      "type": "Sectoral",
+      "display_name": "Nifty Chemicals"
+    },
+    "FINNIFTY": {
+      "category": "Financial Services",
+      "type": "Sectoral",
+      "display_name": "Nifty Financial Services"
+    },
+    "NIFTY FIN SERVICE": {
+      "category": "Financial Services",
+      "type": "Sectoral",
+      "display_name": "Nifty Financial Services 25/50"
+    },
+    "NIFTY FINSEREXBNK": {
+      "category": "Financial Services",
+      "type": "Sectoral",
+      "display_name": "Nifty Financial Services Ex Bank"
+    },
+    "NIFTY FMCG": {
+      "category": "FMCG",
+      "type": "Sectoral",
+      "display_name": "Nifty FMCG"
+    },
+    "NIFTY HEALTHCARE": {
+      "category": "Healthcare",
+      "type": "Sectoral",
+      "display_name": "Nifty Healthcare"
+    },
+    "NIFTY IT": {
+      "category": "IT",
+      "type": "Sectoral",
+      "display_name": "Nifty IT"
+    },
+    "NIFTY MEDIA": {
+      "category": "Media",
+      "type": "Sectoral",
+      "display_name": "Nifty Media"
+    },
+    "NIFTY METAL": {
+      "category": "Metal",
+      "type": "Sectoral",
+      "display_name": "Nifty Metal"
+    },
+    "NIFTY PHARMA": {
+      "category": "Pharma",
+      "type": "Sectoral",
+      "display_name": "Nifty Pharma"
+    },
+    "NIFTY PVT BANK": {
+      "category": "Banking",
+      "type": "Sectoral",
+      "display_name": "Nifty Private Bank"
+    },
+    "NIFTY PSU BANK": {
+      "category": "Banking",
+      "type": "Sectoral",
+      "display_name": "Nifty PSU Bank"
+    },
+    "NIFTY REALTY": {
+      "category": "Realty",
+      "type": "Sectoral",
+      "display_name": "Nifty Realty"
+    },
+    "NIFTY CONSR DURBL": {
+      "category": "Consumer Durables",
+      "type": "Sectoral",
+      "display_name": "Nifty Consumer Durables"
+    },
+    "NIFTY OIL AND GAS": {
+      "category": "Oil & Gas",
+      "type": "Sectoral",
+      "display_name": "Nifty Oil and Gas"
+    },
+    "NIFTY500 HEALTH": {
+      "category": "Healthcare",
+      "type": "Sectoral",
+      "display_name": "Nifty500 Healthcare"
+    },
+    "NIFTY MS FIN SERV": {
+      "category": "Financial Services",
+      "type": "Sectoral",
+      "display_name": "Nifty MidSmall Financial Services"
+    },
+    "NIFTY MIDSML HLTH": {
+      "category": "Healthcare",
+      "type": "Sectoral",
+      "display_name": "Nifty MidSmall Healthcare"
+    },
+    "NIFTY MS IT TELCM": {
+      "category": "IT & Telecom",
+      "type": "Sectoral",
+      "display_name": "Nifty MidSmall IT & Telecom"
+    }
+  },
+  "thematic_indices": {
+    "NIFTY CAPITAL MKT": {
+      "category": "Capital Markets",
+      "type": "Thematic",
+      "display_name": "Nifty Capital Markets"
+    },
+    "NIFTY COMMODITIES": {
+      "category": "Commodities",
+      "type": "Thematic",
+      "display_name": "Nifty Commodities"
+    },
+    "NIFTY CONGLOMERATE": {
+      "category": "Conglomerate",
+      "type": "Thematic",
+      "display_name": "Nifty Conglomerate 50"
+    },
+    "NIFTY COREHOUSING": {
+      "category": "Housing",
+      "type": "Thematic",
+      "display_name": "Nifty Core Housing"
+    },
+    "NIFTY CPSE": {
+      "category": "CPSE",
+      "type": "Thematic",
+      "display_name": "Nifty CPSE"
+    },
+    "NIFTY ENERGY": {
+      "category": "Energy",
+      "type": "Thematic",
+      "display_name": "Nifty Energy"
+    },
+    "NIFTY EV": {
+      "category": "EV & New Age Auto",
+      "type": "Thematic",
+      "display_name": "Nifty EV & New Age Automotive"
+    },
+    "NIFTY HOUSING": {
+      "category": "Housing",
+      "type": "Thematic",
+      "display_name": "Nifty Housing"
+    },
+    "NIFTY100 ESG": {
+      "category": "ESG",
+      "type": "Thematic",
+      "display_name": "Nifty100 ESG"
+    },
+    "NIFTY100 ENH ESG": {
+      "category": "ESG",
+      "type": "Thematic",
+      "display_name": "Nifty100 Enhanced ESG"
+    },
+    "NIFTY100ESGSECLDR": {
+      "category": "ESG",
+      "type": "Thematic",
+      "display_name": "Nifty100 ESG Sector Leaders"
+    },
+    "NIFTY CONSUMPTION": {
+      "category": "Consumption",
+      "type": "Thematic",
+      "display_name": "Nifty India Consumption"
+    },
+    "NIFTY IND DEFENCE": {
+      "category": "Defence",
+      "type": "Thematic",
+      "display_name": "Nifty India Defence"
+    },
+    "NIFTY IND DIGITAL": {
+      "category": "Digital",
+      "type": "Thematic",
+      "display_name": "Nifty India Digital"
+    },
+    "NIFTY INFRALOG": {
+      "category": "Infrastructure & Logistics",
+      "type": "Thematic",
+      "display_name": "Nifty India Infrastructure & Logistics"
+    },
+    "NIFTY INTERNET": {
+      "category": "Internet",
+      "type": "Thematic",
+      "display_name": "Nifty India Internet"
+    },
+    "NIFTY INDIA MFG": {
+      "category": "Manufacturing",
+      "type": "Thematic",
+      "display_name": "Nifty India Manufacturing"
+    },
+    "NIFTY NEW CONSUMP": {
+      "category": "Consumption",
+      "type": "Thematic",
+      "display_name": "Nifty India New Age Consumption"
+    },
+    "NIFTY IND TOURISM": {
+      "category": "Tourism",
+      "type": "Thematic",
+      "display_name": "Nifty India Tourism"
+    },
+    "NIFTY CORP MAATR": {
+      "category": "Corporate Groups",
+      "type": "Thematic",
+      "display_name": "Nifty India Select 5 Corporate Groups (MAATR)"
+    },
+    "NIFTY INFRA": {
+      "category": "Infrastructure",
+      "type": "Thematic",
+      "display_name": "Nifty Infrastructure"
+    },
+    "NIFTY IPO": {
+      "category": "IPO",
+      "type": "Thematic",
+      "display_name": "Nifty IPO"
+    },
+    "NIFTY MS IND CONS": {
+      "category": "Consumption",
+      "type": "Thematic",
+      "display_name": "Nifty MidSmall India Consumption"
+    },
+    "NIFTY MNC": {
+      "category": "MNC",
+      "type": "Thematic",
+      "display_name": "Nifty MNC"
+    },
+    "NIFTY MOBILITY": {
+      "category": "Mobility",
+      "type": "Thematic",
+      "display_name": "Nifty Mobility"
+    },
+    "NIFTY PSE": {
+      "category": "PSE",
+      "type": "Thematic",
+      "display_name": "Nifty PSE"
+    },
+    "NIFTY RURAL": {
+      "category": "Rural",
+      "type": "Thematic",
+      "display_name": "Nifty Rural"
+    },
+    "NIFTY NONCYC CONS": {
+      "category": "Non-Cyclical Consumer",
+      "type": "Thematic",
+      "display_name": "Nifty Non-Cyclical Consumer"
+    },
+    "NIFTY SERV SECTOR": {
+      "category": "Services",
+      "type": "Thematic",
+      "display_name": "Nifty Services Sector"
+    },
+    "NIFTY TRANS LOGIS": {
+      "category": "Transportation & Logistics",
+      "type": "Thematic",
+      "display_name": "Nifty Transportation & Logistics"
+    },
+    "NIFTY MULTI MFG": {
+      "category": "Manufacturing",
+      "type": "Thematic",
+      "display_name": "Nifty500 Multicap India Manufacturing 50:30:20"
+    },
+    "NIFTY SME EMERGE": {
+      "category": "SME",
+      "type": "Thematic",
+      "display_name": "Nifty SME Emerge"
+    },
+    "NIFTY WAVES": {
+      "category": "Waves",
+      "type": "Thematic",
+      "display_name": "Nifty Waves"
+    }
+  },
+  "broad_market_indices": {
+    "NIFTY": {
+      "category": "Broad Market",
+      "type": "Benchmark",
+      "display_name": "Nifty 50"
+    },
+    "NIFTY 100": {
+      "category": "Broad Market",
+      "type": "Benchmark",
+      "display_name": "Nifty 100"
+    },
+    "NIFTY 200": {
+      "category": "Broad Market",
+      "type": "Benchmark",
+      "display_name": "Nifty 200"
+    },
+    "NIFTY 500": {
+      "category": "Broad Market",
+      "type": "Benchmark",
+      "display_name": "Nifty 500"
+    },
+    "NIFTY MIDCAP 50": {
+      "category": "Broad Market",
+      "type": "Benchmark",
+      "display_name": "Nifty Midcap 50"
+    },
+    "NIFTY MIDCAP 100": {
+      "category": "Broad Market",
+      "type": "Benchmark",
+      "display_name": "Nifty Midcap 100"
+    },
+    "NIFTY MIDCAP 150": {
+      "category": "Broad Market",
+      "type": "Benchmark",
+      "display_name": "Nifty Midcap 150"
+    },
+    "NIFTY SMLCAP 50": {
+      "category": "Broad Market",
+      "type": "Benchmark",
+      "display_name": "Nifty Smallcap 50"
+    },
+    "NIFTY SMLCAP 100": {
+      "category": "Broad Market",
+      "type": "Benchmark",
+      "display_name": "Nifty Smallcap 100"
+    },
+    "NIFTY SMLCAP 250": {
+      "category": "Broad Market",
+      "type": "Benchmark",
+      "display_name": "Nifty Smallcap 250"
+    }
+  }
+}
