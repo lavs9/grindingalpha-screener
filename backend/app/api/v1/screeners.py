@@ -223,13 +223,17 @@ async def get_high_volume_movers(
     results = db.query(
         CalculatedMetrics.symbol,
         CalculatedMetrics.rvol,
-        CalculatedMetrics.volume_50d_avg,
         CalculatedMetrics.change_1d_percent,
-        CalculatedMetrics.rs_percentile,
-        CalculatedMetrics.atr_percent,
-        Security.security_name
+        Security.security_name,
+        OHLCVDaily.volume,
+        OHLCVDaily.close
     ).join(
         Security, Security.symbol == CalculatedMetrics.symbol
+    ).join(
+        OHLCVDaily, and_(
+            OHLCVDaily.symbol == CalculatedMetrics.symbol,
+            OHLCVDaily.date == target_date
+        )
     ).filter(
         and_(
             CalculatedMetrics.date == target_date,
@@ -244,11 +248,10 @@ async def get_high_volume_movers(
         stocks.append({
             "symbol": row.symbol,
             "name": row.security_name,
-            "rvol": float(row.rvol) if row.rvol else None,
-            "volume_50d_avg": int(row.volume_50d_avg) if row.volume_50d_avg else None,
-            "change_percent": float(row.change_1d_percent) if row.change_1d_percent else None,
-            "rs_percentile": float(row.rs_percentile) if row.rs_percentile else None,
-            "atr_percent": float(row.atr_percent) if row.atr_percent else None
+            "volume": int(row.volume) if row.volume else 0,
+            "rvol": float(row.rvol) if row.rvol else 0.0,
+            "change_1d_percent": float(row.change_1d_percent) if row.change_1d_percent else 0.0,
+            "close": float(row.close) if row.close else 0.0
         })
 
     return {
