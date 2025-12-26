@@ -163,24 +163,50 @@ class DailyMetricsCalculator:
             return {
                 "universe_up_count": 0,
                 "universe_down_count": 0,
-                "mcclellan_oscillator": 0,
-                "mcclellan_summation": 0
+                "mcclellan_oscillator": 0.0,
+                "mcclellan_summation": 0.0
             }
 
         # Breadth: Count up/down stocks
         universe_up = (target_data['close'] >= target_data['open']).sum()
         universe_down = (target_data['close'] < target_data['open']).sum()
 
-        # McClellan Oscillator: (advances - declines)
-        # Simplified: Use 19-day and 39-day EMA of (up_count - down_count)
-        # TODO: Implement proper McClellan calculation with historical data
-        advances_minus_declines = universe_up - universe_down
+        # McClellan Oscillator: 19-day EMA - 39-day EMA of (advances - declines)
+        unique_dates = sorted(ohlcv_data['date'].unique())
+        target_date_idx = unique_dates.index(target_date) if target_date in unique_dates else -1
+
+        if target_date_idx < 40:
+            # Not enough historical data for McClellan
+            return {
+                "universe_up_count": int(universe_up),
+                "universe_down_count": int(universe_down),
+                "mcclellan_oscillator": 0.0,
+                "mcclellan_summation": 0.0
+            }
+
+        # Calculate advances - declines for past 40 days
+        lookback_dates = unique_dates[max(0, target_date_idx - 40):target_date_idx + 1]
+        ad_values = []
+
+        for d in lookback_dates:
+            day_data = ohlcv_data[ohlcv_data['date'] == d]
+            advances = (day_data['close'] >= day_data['open']).sum()
+            declines = (day_data['close'] < day_data['open']).sum()
+            ad_values.append(advances - declines)
+
+        # Calculate EMAs
+        ad_series = pd.Series(ad_values)
+        ema19 = ad_series.ewm(span=19, adjust=False).mean().iloc[-1]
+        ema39 = ad_series.ewm(span=39, adjust=False).mean().iloc[-1]
+
+        mcclellan_osc = float(ema19 - ema39)
+        mcclellan_sum = mcclellan_osc  # Simplified - full implementation requires historical state
 
         return {
             "universe_up_count": int(universe_up),
             "universe_down_count": int(universe_down),
-            "mcclellan_oscillator": float(advances_minus_declines),  # Simplified
-            "mcclellan_summation": 0  # TODO: Cumulative sum of oscillator
+            "mcclellan_oscillator": round(mcclellan_osc, 2),
+            "mcclellan_summation": round(mcclellan_sum, 2)
         }
 
     def _calculate_symbol_metrics(
@@ -251,10 +277,10 @@ class DailyMetricsCalculator:
         # ===== 11. BREADTH METRICS (Universe-wide) =====
         metrics.update(universe_metrics)
 
-        # ===== 12. RRG METRICS (Placeholder - requires benchmark) =====
-        # TODO: Calculate RS-Ratio and RS-Momentum vs. benchmark index
-        metrics['rs_ratio'] = 100.0  # Placeholder
-        metrics['rs_momentum'] = 0.0  # Placeholder
+        # ===== 12. RRG METRICS (vs. benchmark index) =====
+        # Calculate if we have at least 10 days of price data
+        rrg_metrics = self._calc_rrg_metrics(df, target_idx, symbol)
+        metrics.update(rrg_metrics)
 
         # ===== 13. CANDLE TYPE =====
         metrics['is_green_candle'] = 1 if close >= open_price else 0
@@ -533,6 +559,41 @@ class DailyMetricsCalculator:
         return {
             'stage': stage,
             'stage_detail': stage_detail
+        }
+
+    def _calc_rrg_metrics(self, df: pd.DataFrame, idx: int, symbol: str) -> Dict:
+        """
+        Calculate RRG (Relative Rotation Graph) metrics vs. benchmark.
+
+        RS-Ratio = (stock close / benchmark close) * 100 (normalized to 100)
+        RS-Momentum = 1-week ROC of RS-Ratio (smoothed)
+
+        For simplicity, we use the stock's own 1-week momentum as a proxy.
+        Full RRG requires benchmark index OHLCV data.
+        """
+        if idx < 10:
+            return {
+                'rs_ratio': 100.0,
+                'rs_momentum': 0.0
+            }
+
+        # Simplified RRG metrics (using stock's own momentum as proxy)
+        # In production, fetch benchmark OHLCV and calculate relative performance
+        close = df.loc[idx, 'close']
+        close_1w = df.loc[idx - 5, 'close'] if idx >= 5 else close
+
+        # RS-Ratio: Normalized to 100 (stock performance over past week)
+        # In full implementation: (stock_close / benchmark_close) / (stock_close_1w_ago / benchmark_close_1w_ago) * 100
+        ratio_change = (close / close_1w) if close_1w > 0 else 1.0
+        rs_ratio = ratio_change * 100.0
+
+        # RS-Momentum: 1-week rate of change of RS-Ratio
+        # Simplified: Use stock's weekly % change
+        rs_momentum = ((close - close_1w) / close_1w * 100) if close_1w > 0 else 0.0
+
+        return {
+            'rs_ratio': round(rs_ratio, 2),
+            'rs_momentum': round(rs_momentum, 2)
         }
 
     def _calculate_rs_percentiles(self, all_metrics: List[Dict]) -> List[Dict]:
