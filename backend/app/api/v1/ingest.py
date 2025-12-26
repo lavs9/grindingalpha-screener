@@ -20,6 +20,7 @@ from app.services.upstox.instrument_service import ingest_instruments_from_upsto
 from app.services.upstox.daily_quotes_service import DailyQuotesService
 from app.services.upstox.historical_service import HistoricalDataService
 from app.services.upstox.batch_historical_service import BatchHistoricalService
+from app.services.upstox.index_historical_service import IndexHistoricalService
 from app.schemas.upstox import InstrumentIngestionResponse
 from app.utils.resource_monitor import monitor_resources
 
@@ -954,3 +955,83 @@ async def ingest_daily_ohlcv(
         "errors": result["errors"][:50],
         "execution_time_ms": result["execution_time_ms"]
     }
+
+
+@router.post("/indices-historical-ohlcv")
+@monitor_resources("Historical Index OHLCV Ingestion")
+async def ingest_indices_historical_ohlcv(
+    index_symbols: Optional[List[str]] = Query(None, description="Optional list of index symbols. If not provided, fetches all NSE indices"),
+    start_date: Optional[date] = Query(None, description="Start date (default: 5 years ago)"),
+    end_date: Optional[date] = Query(None, description="End date (default: yesterday)"),
+    batch_size: int = Query(20, description="Number of indices to process in parallel (default: 20)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Ingest historical OHLCV data for NSE indices from Upstox.
+
+    This endpoint fetches 5 years of historical candle data for all NSE indices
+    or a specified list of index symbols. Essential for RRG Charts and benchmarking.
+
+    **Source:** Upstox API `/v2/historical-candle/{instrument_key}/day/{to_date}/{from_date}`
+
+    **Process:**
+    1. Get all NSE indices from upstox_instruments table (or filter by provided symbols)
+    2. For each index, fetch historical daily candles (5 years by default)
+    3. Insert OHLCV records into ohlcv_daily table (upsert on symbol+date)
+    4. Process in batches to respect Upstox API rate limits
+
+    **Key Indices:**
+    - NIFTY 50 (benchmark)
+    - NIFTY 500 (broad market)
+    - Sectoral indices (NIFTY BANK, NIFTY IT, NIFTY AUTO, etc.)
+    - Thematic indices
+
+    **Query Parameters:**
+    - index_symbols: Optional list of index symbols (e.g., ['NIFTY 50', 'NIFTY BANK'])
+    - start_date: Start date for historical data (YYYY-MM-DD, default: 5 years ago)
+    - end_date: End date (YYYY-MM-DD, default: yesterday)
+    - batch_size: Number of indices to process in parallel (default: 20)
+
+    **Returns:**
+    - total_indices: Number of indices processed
+    - records_inserted: Total OHLCV records inserted
+    - records_updated: Total OHLCV records updated
+    - indices_failed: Number of indices that failed
+    - errors: List of error messages
+    - execution_time_ms: Total execution time
+
+    **Example:**
+    ```bash
+    # Fetch all NSE indices (5 years historical)
+    curl -X POST "http://localhost:8000/api/v1/ingest/indices-historical-ohlcv"
+
+    # Fetch specific indices
+    curl -X POST "http://localhost:8000/api/v1/ingest/indices-historical-ohlcv?index_symbols=NIFTY%2050&index_symbols=NIFTY%20BANK"
+    ```
+    """
+    try:
+        # Use IndexHistoricalService to fetch OHLCV data
+        service = IndexHistoricalService(db)
+        result = service.ingest_historical_ohlcv_batch(
+            index_symbols=index_symbols,
+            start_date=start_date,
+            end_date=end_date,
+            batch_size=batch_size
+        )
+
+        return {
+            "message": "Index OHLCV ingestion completed",
+            "success": result["success"],
+            "indices_processed": result["indices_processed"],
+            "records_inserted": result["records_inserted"],
+            "records_updated": result["records_updated"],
+            "indices_failed": result["indices_failed"],
+            "errors": result["errors"][:50] if result["errors"] else [],
+            "execution_time_ms": result["execution_time_ms"]
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to ingest index OHLCV data: {str(e)}"
+        )
