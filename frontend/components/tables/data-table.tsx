@@ -30,6 +30,7 @@ interface DataTableProps<TData, TValue> {
   data: TData[];
   searchKey?: string;
   searchPlaceholder?: string;
+  showMarketCapFilter?: boolean;
 }
 
 export function DataTable<TData, TValue>({
@@ -37,9 +38,29 @@ export function DataTable<TData, TValue>({
   data,
   searchKey,
   searchPlaceholder = "Search...",
+  showMarketCapFilter = false,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
+  const [minMarketCap, setMinMarketCap] = React.useState<string>("");
+  const [maxMarketCap, setMaxMarketCap] = React.useState<string>("");
+
+  // Apply market cap filter when min/max values change
+  React.useEffect(() => {
+    if (!showMarketCapFilter) return;
+
+    const minCr = parseFloat(minMarketCap);
+    const maxCr = parseFloat(maxMarketCap);
+
+    if (!isNaN(minCr) || !isNaN(maxCr)) {
+      table.getColumn("market_cap")?.setFilterValue([
+        isNaN(minCr) ? undefined : minCr * 10000000, // Convert crores to absolute value
+        isNaN(maxCr) ? undefined : maxCr * 10000000,
+      ]);
+    } else {
+      table.getColumn("market_cap")?.setFilterValue(undefined);
+    }
+  }, [minMarketCap, maxMarketCap, showMarketCapFilter]);
 
   const table = useReactTable({
     data,
@@ -63,8 +84,8 @@ export function DataTable<TData, TValue>({
 
   return (
     <div className="space-y-4">
-      {searchKey && (
-        <div className="flex items-center">
+      <div className="flex items-center gap-4 flex-wrap">
+        {searchKey && (
           <Input
             placeholder={searchPlaceholder}
             value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
@@ -73,8 +94,41 @@ export function DataTable<TData, TValue>({
             }
             className="max-w-sm"
           />
-        </div>
-      )}
+        )}
+        {showMarketCapFilter && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground whitespace-nowrap">Market Cap (Cr):</span>
+            <Input
+              type="number"
+              placeholder="Min"
+              value={minMarketCap}
+              onChange={(e) => setMinMarketCap(e.target.value)}
+              className="w-24"
+            />
+            <span className="text-muted-foreground">-</span>
+            <Input
+              type="number"
+              placeholder="Max"
+              value={maxMarketCap}
+              onChange={(e) => setMaxMarketCap(e.target.value)}
+              className="w-24"
+            />
+            {(minMarketCap || maxMarketCap) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setMinMarketCap("");
+                  setMaxMarketCap("");
+                }}
+                className="h-8 px-2"
+              >
+                Clear
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
       <div className="rounded-md border">
         <Table>
           <TableHeader>

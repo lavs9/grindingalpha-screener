@@ -96,6 +96,15 @@ const columns: ColumnDef<RSLeaderStock>[] = [
       const marketCap = row.getValue("market_cap") as number | null;
       return <div className="font-mono text-sm">{formatMarketCap(marketCap)}</div>;
     },
+    filterFn: (row, columnId, filterValue) => {
+      const marketCap = row.getValue(columnId) as number | null;
+      if (marketCap === null) return false;
+
+      const [min, max] = filterValue as [number | undefined, number | undefined];
+      if (min !== undefined && marketCap < min) return false;
+      if (max !== undefined && marketCap > max) return false;
+      return true;
+    },
   },
   {
     accessorKey: "stage_detail",
@@ -201,6 +210,7 @@ export default function RSLeadersPage() {
               data={data}
               searchKey="symbol"
               searchPlaceholder="Search by symbol..."
+              showMarketCapFilter={true}
             />
           )}
         </CardContent>

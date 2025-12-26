@@ -94,6 +94,15 @@ const columns: ColumnDef<MAStackedStock>[] = [
       const marketCap = row.getValue("market_cap") as number | null;
       return <div className="font-mono text-sm">{formatMarketCap(marketCap)}</div>;
     },
+    filterFn: (row, columnId, filterValue) => {
+      const marketCap = row.getValue(columnId) as number | null;
+      if (marketCap === null) return false;
+
+      const [min, max] = filterValue as [number | undefined, number | undefined];
+      if (min !== undefined && marketCap < min) return false;
+      if (max !== undefined && marketCap > max) return false;
+      return true;
+    },
   },
   {
     accessorKey: "stage",
@@ -275,6 +284,7 @@ export default function MAStackedPage() {
             data={data.results}
             searchKey="symbol"
             searchPlaceholder="Search symbol..."
+            showMarketCapFilter={true}
           />
         </CardContent>
       </Card>
