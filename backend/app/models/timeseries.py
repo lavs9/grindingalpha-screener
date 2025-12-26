@@ -34,6 +34,10 @@ class IndexOHLCVDaily(Base):
     close = Column(Numeric(12, 2), nullable=False, comment="Closing index value")
     volume = Column(BigInteger, nullable=True, comment="Volume (may be null for some indices)")
 
+    # Sector categorization for RRG filtering
+    sector_category = Column(String(50), nullable=True, comment="Sector category (Banking, IT, Pharma, Auto, etc.)")
+    is_sectoral = Column(Integer, nullable=True, server_default='0', comment="1 if sectoral/thematic index, 0 for broad market")
+
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -41,6 +45,7 @@ class IndexOHLCVDaily(Base):
         UniqueConstraint('symbol', 'date', name='uq_index_ohlcv_symbol_date'),
         Index('idx_index_ohlcv_symbol_date_desc', 'symbol', text('date DESC')),
         Index('idx_index_ohlcv_date', 'date'),
+        Index('idx_index_ohlcv_sector', 'sector_category'),
     )
 
     def __repr__(self):
