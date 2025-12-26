@@ -63,13 +63,18 @@ async def get_4percent_breakouts(
         CalculatedMetrics.symbol,
         CalculatedMetrics.change_1d_percent,
         CalculatedMetrics.rvol,
-        CalculatedMetrics.volume_50d_avg,
-        CalculatedMetrics.rs_percentile,
-        CalculatedMetrics.atr_percent,
         CalculatedMetrics.stage,
-        Security.security_name
+        CalculatedMetrics.stage_detail,
+        Security.security_name,
+        OHLCVDaily.volume,
+        OHLCVDaily.close
     ).join(
         Security, Security.symbol == CalculatedMetrics.symbol
+    ).join(
+        OHLCVDaily, and_(
+            OHLCVDaily.symbol == CalculatedMetrics.symbol,
+            OHLCVDaily.date == target_date
+        )
     ).filter(
         and_(
             CalculatedMetrics.date == target_date,
@@ -85,12 +90,12 @@ async def get_4percent_breakouts(
         stocks.append({
             "symbol": row.symbol,
             "name": row.security_name,
-            "change_percent": float(row.change_1d_percent) if row.change_1d_percent else None,
-            "rvol": float(row.rvol) if row.rvol else None,
-            "volume_50d_avg": int(row.volume_50d_avg) if row.volume_50d_avg else None,
-            "rs_percentile": float(row.rs_percentile) if row.rs_percentile else None,
-            "atr_percent": float(row.atr_percent) if row.atr_percent else None,
-            "stage": row.stage
+            "change_1d_percent": float(row.change_1d_percent) if row.change_1d_percent else 0.0,
+            "rvol": float(row.rvol) if row.rvol else 0.0,
+            "volume": int(row.volume) if row.volume else 0,
+            "close": float(row.close) if row.close else 0.0,
+            "stage": row.stage if row.stage else 0,
+            "stage_detail": row.stage_detail if row.stage_detail else ""
         })
 
     return {
