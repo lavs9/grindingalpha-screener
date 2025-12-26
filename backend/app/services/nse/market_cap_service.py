@@ -119,8 +119,15 @@ def fetch_market_cap_data(target_date: date, file_path: Optional[str] = None) ->
             url = get_market_cap_url(target_date)
             result["source"] = url
 
-            # Download to temporary file
-            response = requests.get(url, timeout=60)
+            # Download to temporary file with browser headers
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive'
+            }
+            response = requests.get(url, headers=headers, timeout=60)
             response.raise_for_status()
 
             # Save to temp file

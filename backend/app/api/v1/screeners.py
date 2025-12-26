@@ -10,7 +10,7 @@ from typing import Optional, List
 from datetime import date, timedelta
 
 from app.database.session import get_db
-from app.models.timeseries import CalculatedMetrics, OHLCVDaily, IndexOHLCVDaily
+from app.models.timeseries import CalculatedMetrics, OHLCVDaily, IndexOHLCVDaily, MarketCapHistory
 from app.models.security import Security
 from app.models.metadata import IndustryClassification
 
@@ -67,13 +67,19 @@ async def get_4percent_breakouts(
         CalculatedMetrics.stage_detail,
         Security.security_name,
         OHLCVDaily.volume,
-        OHLCVDaily.close
+        OHLCVDaily.close,
+        MarketCapHistory.market_cap
     ).join(
         Security, Security.symbol == CalculatedMetrics.symbol
     ).join(
         OHLCVDaily, and_(
             OHLCVDaily.symbol == CalculatedMetrics.symbol,
             OHLCVDaily.date == target_date
+        )
+    ).outerjoin(
+        MarketCapHistory, and_(
+            MarketCapHistory.symbol == CalculatedMetrics.symbol,
+            MarketCapHistory.date == target_date
         )
     ).filter(
         and_(
@@ -95,7 +101,8 @@ async def get_4percent_breakouts(
             "volume": int(row.volume) if row.volume else 0,
             "close": float(row.close) if row.close else 0.0,
             "stage": row.stage if row.stage else 0,
-            "stage_detail": row.stage_detail if row.stage_detail else ""
+            "stage_detail": row.stage_detail if row.stage_detail else "",
+            "market_cap": float(row.market_cap) if row.market_cap else None
         })
 
     return {
@@ -153,9 +160,15 @@ async def get_rs_leaders(
         CalculatedMetrics.adr_percent,
         CalculatedMetrics.stage,
         CalculatedMetrics.stage_detail,
-        Security.security_name
+        Security.security_name,
+        MarketCapHistory.market_cap
     ).join(
         Security, Security.symbol == CalculatedMetrics.symbol
+    ).outerjoin(
+        MarketCapHistory, and_(
+            MarketCapHistory.symbol == CalculatedMetrics.symbol,
+            MarketCapHistory.date == target_date
+        )
     ).filter(
         and_(
             CalculatedMetrics.date == target_date,
@@ -176,7 +189,8 @@ async def get_rs_leaders(
             "change_1m_percent": float(row.change_1m_percent) if row.change_1m_percent else None,
             "adr_percent": float(row.adr_percent) if row.adr_percent else None,
             "stage": row.stage,
-            "stage_detail": row.stage_detail
+            "stage_detail": row.stage_detail,
+            "market_cap": float(row.market_cap) if row.market_cap else None
         })
 
     return {
