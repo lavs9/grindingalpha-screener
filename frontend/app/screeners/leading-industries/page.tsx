@@ -135,7 +135,7 @@ export default function LeadingIndustriesPage() {
       try {
         setLoading(true);
         setError(null);
-        const response = await fetchLeadingIndustries({ topN: 20 });
+        const response = await fetchLeadingIndustries({ limit: 20 });
         setData(response);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load data");

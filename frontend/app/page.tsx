@@ -73,7 +73,7 @@ const screeners = [
     name: 'Leading Industries',
     description: 'Top 20% sectors by strength',
     icon: Building2,
-    href: '/screeners/industries',
+    href: '/screeners/leading-industries',
     color: 'text-emerald-600',
   },
   {

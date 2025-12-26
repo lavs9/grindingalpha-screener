@@ -148,13 +148,11 @@ export async function fetchBreadthMetrics(params?: {
 // 9. Leading Industries/Groups
 export async function fetchLeadingIndustries(params?: {
   targetDate?: string;
-  topN?: number;
   limit?: number;
 }): Promise<ScreenerResponse<LeadingIndustry>> {
   const response = await apiClient.get('/screeners/leading-industries', {
     params: {
       target_date: params?.targetDate,
-      top_n: params?.topN,
       limit: params?.limit,
     }
   });
