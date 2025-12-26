@@ -85,14 +85,14 @@ export function RRGChart({ data, benchmark }: RRGChartProps) {
     ];
   });
 
-  // Calculate axis ranges dynamically
-  const allRsRatios = data.flatMap(s => s.historical_points.map(p => p.rs_ratio));
-  const allRsMomentums = data.flatMap(s => s.historical_points.map(p => p.rs_momentum));
-
-  const minRatio = Math.min(...allRsRatios);
-  const maxRatio = Math.max(...allRsRatios);
-  const minMomentum = Math.min(...allRsMomentums);
-  const maxMomentum = Math.max(...allRsMomentums);
+  // Fixed axis ranges - quadrants should not move
+  // Use a reasonable fixed range that accommodates typical RRG values
+  const fixedRange = {
+    xMin: 96,
+    xMax: 104,
+    yMin: 97,
+    yMax: 103,
+  };
 
   const layout = {
     title: {
@@ -103,55 +103,59 @@ export function RRGChart({ data, benchmark }: RRGChartProps) {
       title: "JdK RS-Ratio",
       zeroline: false,
       gridcolor: "#e5e7eb",
-      range: [Math.floor(minRatio - 1), Math.ceil(maxRatio + 1)],
+      range: [fixedRange.xMin, fixedRange.xMax],
     },
     yaxis: {
       title: "JdK RS-Momentum",
       zeroline: false,
       gridcolor: "#e5e7eb",
-      range: [Math.floor(minMomentum - 1), Math.ceil(maxMomentum + 1)],
+      range: [fixedRange.yMin, fixedRange.yMax],
     },
     shapes: [
-      // Quadrant background shading
+      // Quadrant background shading - fixed positions
+      // Leading (top-right)
       {
         type: "rect",
         x0: 100,
-        x1: Math.ceil(maxRatio + 1),
+        x1: fixedRange.xMax,
         y0: 100,
-        y1: Math.ceil(maxMomentum + 1),
+        y1: fixedRange.yMax,
         fillcolor: "#22c55e",
         opacity: 0.1,
         line: { width: 0 },
         layer: "below",
       },
+      // Weakening (bottom-right)
       {
         type: "rect",
         x0: 100,
-        x1: Math.ceil(maxRatio + 1),
-        y0: Math.floor(minMomentum - 1),
+        x1: fixedRange.xMax,
+        y0: fixedRange.yMin,
         y1: 100,
         fillcolor: "#eab308",
         opacity: 0.1,
         line: { width: 0 },
         layer: "below",
       },
+      // Lagging (bottom-left)
       {
         type: "rect",
-        x0: Math.floor(minRatio - 1),
+        x0: fixedRange.xMin,
         x1: 100,
-        y0: Math.floor(minMomentum - 1),
+        y0: fixedRange.yMin,
         y1: 100,
         fillcolor: "#ef4444",
         opacity: 0.1,
         line: { width: 0 },
         layer: "below",
       },
+      // Improving (top-left)
       {
         type: "rect",
-        x0: Math.floor(minRatio - 1),
+        x0: fixedRange.xMin,
         x1: 100,
         y0: 100,
-        y1: Math.ceil(maxMomentum + 1),
+        y1: fixedRange.yMax,
         fillcolor: "#3b82f6",
         opacity: 0.1,
         line: { width: 0 },
@@ -162,8 +166,8 @@ export function RRGChart({ data, benchmark }: RRGChartProps) {
         type: "line",
         x0: 100,
         x1: 100,
-        y0: Math.floor(minMomentum - 1),
-        y1: Math.ceil(maxMomentum + 1),
+        y0: fixedRange.yMin,
+        y1: fixedRange.yMax,
         line: {
           color: "#666",
           width: 2,
@@ -173,8 +177,8 @@ export function RRGChart({ data, benchmark }: RRGChartProps) {
       // Horizontal line at y=100 (RS-Momentum axis)
       {
         type: "line",
-        x0: Math.floor(minRatio - 1),
-        x1: Math.ceil(maxRatio + 1),
+        x0: fixedRange.xMin,
+        x1: fixedRange.xMax,
         y0: 100,
         y1: 100,
         line: {
@@ -185,31 +189,31 @@ export function RRGChart({ data, benchmark }: RRGChartProps) {
       },
     ],
     annotations: [
-      // Quadrant labels
+      // Quadrant labels - fixed positions
       {
-        x: 100 + (maxRatio - 100) * 0.7,
-        y: 100 + (maxMomentum - 100) * 0.8,
+        x: 102.5,
+        y: 102,
         text: "Leading",
         showarrow: false,
         font: { size: 14, color: "#22c55e", weight: "bold" },
       },
       {
-        x: 100 + (maxRatio - 100) * 0.7,
-        y: 100 - (100 - minMomentum) * 0.8,
+        x: 102.5,
+        y: 98,
         text: "Weakening",
         showarrow: false,
         font: { size: 14, color: "#eab308", weight: "bold" },
       },
       {
-        x: 100 - (100 - minRatio) * 0.7,
-        y: 100 - (100 - minMomentum) * 0.8,
+        x: 97.5,
+        y: 98,
         text: "Lagging",
         showarrow: false,
         font: { size: 14, color: "#ef4444", weight: "bold" },
       },
       {
-        x: 100 - (100 - minRatio) * 0.7,
-        y: 100 + (maxMomentum - 100) * 0.8,
+        x: 97.5,
+        y: 102,
         text: "Improving",
         showarrow: false,
         font: { size: 14, color: "#3b82f6", weight: "bold" },
