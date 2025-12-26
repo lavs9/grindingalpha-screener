@@ -13,6 +13,15 @@ interface RRGChartProps {
 }
 
 export function RRGChart({ data, benchmark }: RRGChartProps) {
+  // Handle empty data
+  if (!data || data.length === 0) {
+    return (
+      <div className="w-full h-[600px] flex items-center justify-center text-muted-foreground">
+        No data to display. Try adjusting your filters.
+      </div>
+    );
+  }
+
   // Color mapping by current quadrant
   const quadrantColors = {
     Leading: "#22c55e", // green-500

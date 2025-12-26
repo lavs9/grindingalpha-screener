@@ -9,6 +9,7 @@ import { DataTable, SortableHeader } from "@/components/tables/data-table";
 import { RRGChart } from "@/components/charts/rrg-chart";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchRRGCharts } from "@/lib/api/screeners";
 import type { RRGSector, RRGChartsResponse } from "@/lib/types/screener";
@@ -100,6 +101,7 @@ export default function RRGChartsPage() {
   const [data, setData] = React.useState<RRGChartsResponse | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [searchFilter, setSearchFilter] = React.useState<string>("");
 
   React.useEffect(() => {
     async function loadData() {
@@ -118,6 +120,17 @@ export default function RRGChartsPage() {
 
     loadData();
   }, []);
+
+  // Filter data based on search input
+  const filteredResults = React.useMemo(() => {
+    if (!data?.results) return [];
+    if (!searchFilter) return data.results;
+
+    const lowerFilter = searchFilter.toLowerCase();
+    return data.results.filter((sector) =>
+      sector.index_symbol.toLowerCase().includes(lowerFilter)
+    );
+  }, [data?.results, searchFilter]);
 
   if (loading) {
     return (
@@ -216,11 +229,12 @@ export default function RRGChartsPage() {
         <CardHeader>
           <CardTitle>RRG Scatter Plot</CardTitle>
           <CardDescription>
-            Sectors in the top-right (Leading) quadrant are outperforming with positive momentum
+            Sectors in the top-right (Leading) quadrant are outperforming with positive momentum.
+            {searchFilter && ` Showing ${filteredResults.length} of ${data.count} filtered indices.`}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <RRGChart data={data.results} benchmark={data.benchmark} />
+          <RRGChart data={filteredResults} benchmark={data.benchmark} />
         </CardContent>
       </Card>
 
@@ -233,12 +247,22 @@ export default function RRGChartsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <DataTable
-            columns={columns}
-            data={data.results}
-            searchKey="index_symbol"
-            searchPlaceholder="Search index..."
-          />
+          <div className="space-y-4">
+            {/* Search Input */}
+            <div className="flex items-center">
+              <Input
+                placeholder="Search index..."
+                value={searchFilter}
+                onChange={(e) => setSearchFilter(e.target.value)}
+                className="max-w-sm"
+              />
+            </div>
+            {/* Table with filtered data */}
+            <DataTable
+              columns={columns}
+              data={filteredResults}
+            />
+          </div>
         </CardContent>
       </Card>
 
