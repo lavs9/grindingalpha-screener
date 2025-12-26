@@ -795,23 +795,27 @@ async def get_leading_industries(
 async def get_rrg_charts(
     target_date: Optional[date] = Query(None, description="Date to analyze (default: latest available)"),
     benchmark: str = Query("NIFTY", description="Benchmark index symbol (default: NIFTY)"),
-    lookback_days: int = Query(5, description="Lookback period for RS-Momentum calculation (default: 5 trading days)"),
+    short_period: int = Query(21, description="Short momentum period in trading days (default: 21)"),
+    long_period: int = Query(63, description="Long momentum period in trading days (default: 63 ~3 months)"),
+    tail_length: int = Query(10, description="Number of historical points for RRG tails (default: 10, max: 60)"),
+    show_sectoral_only: bool = Query(True, description="Show only sectoral/thematic indices (default: true)"),
     db: Session = Depends(get_db)
 ):
     """
-    **Screener #10: RRG Charts for Sectoral Indices**
+    **Screener #10: RRG Charts for Sectoral Indices (JdK Methodology)**
 
     Relative Rotation Graph data for sectoral indices (NIFTY BANK, NIFTY IT, etc.) vs. benchmark.
 
-    **RRG Quadrants:**
-    - Leading: RS-Ratio > 100, RS-Momentum > 100 (strong & improving)
-    - Weakening: RS-Ratio > 100, RS-Momentum < 100 (strong but fading)
-    - Lagging: RS-Ratio < 100, RS-Momentum < 100 (weak & deteriorating)
-    - Improving: RS-Ratio < 100, RS-Momentum > 100 (weak but strengthening)
+    **RRG Quadrants (axes cross at 100):**
+    - Leading: RS-Ratio > 100, RS-Momentum > 100 (outperforming & gaining strength)
+    - Weakening: RS-Ratio > 100, RS-Momentum ≤ 100 (outperforming but losing strength)
+    - Lagging: RS-Ratio ≤ 100, RS-Momentum ≤ 100 (underperforming & weakening)
+    - Improving: RS-Ratio ≤ 100, RS-Momentum > 100 (underperforming but gaining strength)
 
-    **Metrics:**
-    - RS-Ratio: (index_close / benchmark_close) / (index_close_start / benchmark_close_start) * 100
-    - RS-Momentum: Weekly rate of change of RS-Ratio
+    **RRG Metrics (RRGPy methodology):**
+    - RS-Ratio: 100 + ((raw_ratio - rolling_mean) / rolling_std) where raw_ratio = 100 * (index/benchmark)
+    - RS-Momentum: 101 + ((roc - rolling_mean) / rolling_std) where roc = rate-of-change of RS-Ratio
+    - Rolling window: 14 periods (default)
 
     **Use Case:**
     Visualize sector rotation and identify sectors moving into leading quadrant.
@@ -820,10 +824,13 @@ async def get_rrg_charts(
     **Query Parameters:**
     - target_date: Date to analyze (default: latest)
     - benchmark: Benchmark symbol like "NIFTY" or "NIFTY 500" (default: NIFTY)
-    - lookback_days: Period for momentum calculation (default: 5 trading days)
+    - short_period: Rolling window for normalization (default: 14 days, ignored if using RRGPy method)
+    - long_period: Historical data periods (default: 63 days for sufficient data)
+    - tail_length: Number of historical points for RRG tails (default: 10, max: 60)
+    - show_sectoral_only: Show only sectoral/thematic indices (default: true)
 
     **Returns:**
-    RRG coordinates for all sectoral indices with quadrant classification.
+    RRG coordinates for all sectoral indices with values hovering around 100.
     """
     # Default to latest available date
     if target_date is None:
@@ -832,125 +839,236 @@ async def get_rrg_charts(
             raise HTTPException(status_code=404, detail="No index data available")
         target_date = latest
 
-    # Get benchmark data for target date and lookback period
-    benchmark_current = db.query(IndexOHLCVDaily.close).filter(
-        and_(
-            IndexOHLCVDaily.symbol == benchmark,
-            IndexOHLCVDaily.date == target_date
-        )
-    ).scalar()
+    # Limit tail_length to max 60 periods
+    tail_length = min(tail_length, 60)
 
-    if not benchmark_current:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No benchmark data found for {benchmark} on {target_date}"
-        )
+    # Rolling window for RRG normalization (standard is 14 periods)
+    rolling_window = 14
 
-    # Get benchmark data from lookback_days ago
-    benchmark_historical = db.query(
+    # Need enough data for: tail_length + 2*rolling_window
+    # - First rolling_window for RS-Ratio normalization
+    # - Second rolling_window for RS-Momentum normalization (which needs ROC of RS-Ratio)
+    # - Plus tail_length for the actual display
+    total_periods_needed = tail_length + (2 * rolling_window)
+    benchmark_data = db.query(
+        IndexOHLCVDaily.date,
         IndexOHLCVDaily.close
     ).filter(
         and_(
             IndexOHLCVDaily.symbol == benchmark,
-            IndexOHLCVDaily.date < target_date
+            IndexOHLCVDaily.date <= target_date
         )
-    ).order_by(IndexOHLCVDaily.date.desc()).limit(lookback_days).all()
+    ).order_by(IndexOHLCVDaily.date.desc()).limit(total_periods_needed).all()
 
-    if len(benchmark_historical) < lookback_days:
+    if len(benchmark_data) < total_periods_needed:
         raise HTTPException(
             status_code=400,
-            detail=f"Insufficient historical data for benchmark. Need {lookback_days} days, found {len(benchmark_historical)}"
+            detail=f"Insufficient historical data for benchmark. Need {total_periods_needed} days, found {len(benchmark_data)}"
         )
 
-    benchmark_start = float(benchmark_historical[lookback_days - 1].close)
-    benchmark_current = float(benchmark_current)
+    # Reverse to chronological order
+    benchmark_data = list(reversed(benchmark_data))
 
-    # Get all sectoral indices (exclude benchmark and non-sectoral indices)
-    excluded_symbols = [benchmark, 'India VIX']  # Add more if needed
-    sectoral_indices = db.query(IndexOHLCVDaily.symbol).filter(
-        and_(
-            IndexOHLCVDaily.date == target_date,
-            ~IndexOHLCVDaily.symbol.in_(excluded_symbols)
-        )
-    ).distinct().all()
+    # Build benchmark price dict
+    benchmark_prices = {row.date: float(row.close) for row in benchmark_data}
+
+    # Get all sectoral indices query
+    sectoral_query = db.query(IndexOHLCVDaily.symbol).filter(
+        IndexOHLCVDaily.date == target_date
+    )
+
+    # Apply sector filter if show_sectoral_only is True
+    if show_sectoral_only:
+        sectoral_query = sectoral_query.filter(IndexOHLCVDaily.is_sectoral == 1)
+    else:
+        # Exclude only benchmark and VIX
+        excluded_symbols = [benchmark, 'India VIX']
+        sectoral_query = sectoral_query.filter(~IndexOHLCVDaily.symbol.in_(excluded_symbols))
+
+    sectoral_indices = sectoral_query.distinct().all()
 
     sectors = []
     for (symbol,) in sectoral_indices:
-        # Get current close
-        current_data = db.query(IndexOHLCVDaily.close).filter(
-            and_(
-                IndexOHLCVDaily.symbol == symbol,
-                IndexOHLCVDaily.date == target_date
-            )
-        ).scalar()
-
-        if not current_data:
-            continue
-
-        # Get historical close (lookback_days ago)
-        historical_data = db.query(
-            IndexOHLCVDaily.close
+        # Get historical data for this index
+        index_data = db.query(
+            IndexOHLCVDaily.date,
+            IndexOHLCVDaily.close,
+            IndexOHLCVDaily.sector_category
         ).filter(
             and_(
                 IndexOHLCVDaily.symbol == symbol,
-                IndexOHLCVDaily.date < target_date
+                IndexOHLCVDaily.date <= target_date
             )
-        ).order_by(IndexOHLCVDaily.date.desc()).limit(lookback_days).all()
+        ).order_by(IndexOHLCVDaily.date.desc()).limit(total_periods_needed).all()
 
-        if len(historical_data) < lookback_days:
+        if len(index_data) < total_periods_needed:
             continue
 
-        index_current = float(current_data)
-        index_start = float(historical_data[lookback_days - 1].close)
+        # Reverse to chronological order
+        index_data = list(reversed(index_data))
 
-        # Calculate RRG metrics
-        # RS-Ratio = (index/benchmark) normalized to 100
-        rs_ratio_current = (index_current / benchmark_current) * 100
-        rs_ratio_start = (index_start / benchmark_start) * 100
+        # Build index price dict
+        index_prices = {row.date: float(row.close) for row in index_data}
+        sector_category = index_data[0].sector_category if index_data else None
 
-        # Normalize RS-Ratio to 100 baseline
-        rs_ratio = (rs_ratio_current / rs_ratio_start) * 100 if rs_ratio_start > 0 else 100.0
+        # Step 1: Calculate raw RS-Ratio: (index/benchmark) × 100
+        rs_ratio_raw = []
+        for i in range(len(index_data)):
+            idx_price = index_prices.get(index_data[i].date)
+            bench_price = benchmark_prices.get(index_data[i].date)
+            if idx_price and bench_price and bench_price > 0:
+                rs_ratio_raw.append((idx_price / bench_price) * 100)
+            else:
+                rs_ratio_raw.append(None)
 
-        # RS-Momentum = ROC of RS-Ratio over lookback period
-        rs_momentum = ((rs_ratio_current - rs_ratio_start) / rs_ratio_start * 100) if rs_ratio_start > 0 else 0.0
+        # Step 2: Calculate normalized RS-Ratio using rolling Z-score
+        # RS-Ratio = 100 + ((raw_ratio - rolling_mean) / rolling_std)
+        rs_ratio_normalized = []
+        import statistics
+        for i in range(len(rs_ratio_raw)):
+            if i < rolling_window - 1:
+                # Not enough data for rolling window
+                rs_ratio_normalized.append(None)
+            else:
+                # Get rolling window
+                window_data = [v for v in rs_ratio_raw[i - rolling_window + 1:i + 1] if v is not None]
+                if len(window_data) >= rolling_window * 0.8:  # Allow 20% missing data
+                    mean_val = statistics.mean(window_data)
+                    std_val = statistics.stdev(window_data) if len(window_data) > 1 else 1
+                    if rs_ratio_raw[i] is not None and std_val > 0:
+                        normalized = 100 + ((rs_ratio_raw[i] - mean_val) / std_val)
+                        rs_ratio_normalized.append(normalized)
+                    else:
+                        rs_ratio_normalized.append(None)
+                else:
+                    rs_ratio_normalized.append(None)
 
-        # Determine quadrant
-        if rs_ratio > 100 and rs_momentum > 0:
-            quadrant = "Leading"
-        elif rs_ratio > 100 and rs_momentum <= 0:
-            quadrant = "Weakening"
-        elif rs_ratio <= 100 and rs_momentum <= 0:
-            quadrant = "Lagging"
-        else:  # rs_ratio <= 100 and rs_momentum > 0
-            quadrant = "Improving"
+        # Step 3: Calculate Rate of Change (ROC) of normalized RS-Ratio
+        # ROC = 100 * ((current / previous) - 1)
+        rsr_roc = []
+        for i in range(len(rs_ratio_normalized)):
+            if i == 0 or rs_ratio_normalized[i] is None or rs_ratio_normalized[i-1] is None:
+                rsr_roc.append(None)
+            else:
+                prev_val = rs_ratio_normalized[i-1]
+                if prev_val != 0:
+                    roc_val = 100 * ((rs_ratio_normalized[i] / prev_val) - 1)
+                    rsr_roc.append(roc_val)
+                else:
+                    rsr_roc.append(None)
 
-        # Calculate weekly % change for the index itself
-        weekly_change = ((index_current - index_start) / index_start * 100) if index_start > 0 else 0.0
+        # Step 4: Calculate RS-Momentum using rolling Z-score of ROC
+        # RS-Momentum = 101 + ((roc - rolling_mean) / rolling_std)
+        rs_momentum_normalized = []
+        for i in range(len(rsr_roc)):
+            if i < rolling_window - 1:
+                # Not enough data for rolling window
+                rs_momentum_normalized.append(None)
+            else:
+                # Get rolling window
+                window_data = [v for v in rsr_roc[i - rolling_window + 1:i + 1] if v is not None]
+                if len(window_data) >= rolling_window * 0.8:  # Allow 20% missing data
+                    mean_val = statistics.mean(window_data)
+                    std_val = statistics.stdev(window_data) if len(window_data) > 1 else 1
+                    if rsr_roc[i] is not None and std_val > 0:
+                        normalized = 101 + ((rsr_roc[i] - mean_val) / std_val)
+                        rs_momentum_normalized.append(normalized)
+                    else:
+                        rs_momentum_normalized.append(None)
+                else:
+                    rs_momentum_normalized.append(None)
+
+        # Calculate weekly change (1 week = ~5 trading days)
+        current_close = float(index_prices.get(target_date, 0.0))
+        if len(index_data) >= 6:  # Need at least 6 days (1 week + current)
+            weekly_start_idx = -6
+            weekly_start_price = float(index_data[weekly_start_idx].close)
+            weekly_change = ((current_close - weekly_start_price) / weekly_start_price * 100) if weekly_start_price > 0 else 0.0
+        else:
+            weekly_change = 0.0
+
+        # Store normalized values for this sector
+        # Extract last tail_length points (only those with valid RS-Ratio and RS-Momentum)
+        # Get the actual dates corresponding to the last tail_length data points
+        tail_dates = [str(index_data[-(i+1)].date) for i in range(tail_length-1, -1, -1)]
 
         sectors.append({
-            "index_symbol": symbol,
-            "rs_ratio": round(rs_ratio, 2),
-            "rs_momentum": round(rs_momentum, 2),
-            "quadrant": quadrant,
+            "symbol": symbol,
+            "sector_category": sector_category,
+            "rs_ratio_normalized": rs_ratio_normalized[-tail_length:],  # Last tail_length points
+            "rs_momentum_normalized": rs_momentum_normalized[-tail_length:],
+            "dates": tail_dates,
             "weekly_change_percent": round(weekly_change, 2),
-            "current_close": round(index_current, 2)
+            "current_close": current_close
         })
 
+    # Build final sector objects with historical points
+    final_sectors = []
+    for sector in sectors:
+        historical_points = []
+
+        for i in range(len(sector["dates"])):
+            ratio_val = sector["rs_ratio_normalized"][i]
+            momentum_val = sector["rs_momentum_normalized"][i]
+
+            if ratio_val is not None and momentum_val is not None:
+                # Determine quadrant (axes cross at 100)
+                if ratio_val > 100 and momentum_val > 100:
+                    quadrant = "Leading"
+                elif ratio_val > 100 and momentum_val <= 100:
+                    quadrant = "Weakening"
+                elif ratio_val <= 100 and momentum_val <= 100:
+                    quadrant = "Lagging"
+                else:  # ratio_val <= 100 and momentum_val > 100
+                    quadrant = "Improving"
+
+                historical_points.append({
+                    "date": sector["dates"][i],
+                    "rs_ratio": round(ratio_val, 4),
+                    "rs_momentum": round(momentum_val, 4),
+                    "quadrant": quadrant
+                })
+
+        if historical_points:
+            latest_point = historical_points[-1]
+            final_sectors.append({
+                "index_symbol": sector["symbol"],
+                "sector_category": sector["sector_category"],
+                "rs_ratio": latest_point["rs_ratio"],
+                "rs_momentum": latest_point["rs_momentum"],
+                "quadrant": latest_point["quadrant"],
+                "weekly_change_percent": sector["weekly_change_percent"],
+                "current_close": round(sector["current_close"], 2),
+                "historical_points": historical_points
+            })
+        else:
+            # Debug: Log sectors with no historical points
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"Sector {sector['symbol']} has no valid historical points. "
+                       f"RS-Ratio count: {len([v for v in sector['rs_ratio_normalized'] if v is not None])}, "
+                       f"RS-Momentum count: {len([v for v in sector['rs_momentum_normalized'] if v is not None])}")
+
     # Sort by RS-Ratio (strongest first)
-    sectors.sort(key=lambda x: x['rs_ratio'], reverse=True)
+    final_sectors.sort(key=lambda x: x['rs_ratio'], reverse=True)
+
+    benchmark_current_close = benchmark_prices.get(target_date, 0.0)
 
     return {
-        "screener": "RRG Charts for Sectoral Indices",
+        "screener": "RRG Charts for Sectoral Indices (RRGPy Methodology)",
         "date": str(target_date),
         "benchmark": benchmark,
-        "benchmark_close": round(benchmark_current, 2),
-        "lookback_days": lookback_days,
-        "count": len(sectors),
+        "benchmark_close": round(benchmark_current_close, 2),
+        "short_period": rolling_window,
+        "long_period": total_periods_needed,
+        "tail_length": tail_length,
+        "show_sectoral_only": show_sectoral_only,
+        "count": len(final_sectors),
         "quadrant_counts": {
-            "Leading": sum(1 for s in sectors if s['quadrant'] == 'Leading'),
-            "Weakening": sum(1 for s in sectors if s['quadrant'] == 'Weakening'),
-            "Lagging": sum(1 for s in sectors if s['quadrant'] == 'Lagging'),
-            "Improving": sum(1 for s in sectors if s['quadrant'] == 'Improving')
+            "Leading": sum(1 for s in final_sectors if s['quadrant'] == 'Leading'),
+            "Weakening": sum(1 for s in final_sectors if s['quadrant'] == 'Weakening'),
+            "Lagging": sum(1 for s in final_sectors if s['quadrant'] == 'Lagging'),
+            "Improving": sum(1 for s in final_sectors if s['quadrant'] == 'Improving')
         },
-        "results": sectors
+        "results": final_sectors
     }

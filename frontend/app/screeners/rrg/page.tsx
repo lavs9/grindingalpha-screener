@@ -23,6 +23,14 @@ const columns: ColumnDef<RRGSector>[] = [
     ),
   },
   {
+    accessorKey: "sector_category",
+    header: ({ column }) => <SortableHeader column={column}>Sector</SortableHeader>,
+    cell: ({ row }) => {
+      const category = row.getValue("sector_category") as string | null;
+      return <div className="text-sm">{category || "—"}</div>;
+    },
+  },
+  {
     accessorKey: "quadrant",
     header: "Quadrant",
     cell: ({ row }) => {
@@ -169,8 +177,8 @@ export default function RRGChartsPage() {
         </Card>
         <Card>
           <CardHeader className="pb-3">
-            <CardDescription>Lookback</CardDescription>
-            <CardTitle className="text-xl">{data.lookback_days} days</CardTitle>
+            <CardDescription>Rolling Window</CardDescription>
+            <CardTitle className="text-xl">{data.short_period} days</CardTitle>
           </CardHeader>
         </Card>
       </div>
@@ -243,36 +251,37 @@ export default function RRGChartsPage() {
           <div className="flex items-start gap-3">
             <Badge className="bg-green-500 mt-0.5">Leading</Badge>
             <div>
-              <strong>Top-Right:</strong> RS-Ratio &gt; 100, RS-Momentum &gt; 0. Sectors
+              <strong>Top-Right:</strong> RS-Ratio &gt; 100, RS-Momentum &gt; 100. Sectors
               outperforming the benchmark with increasing strength. <strong>Buy/Hold</strong>
             </div>
           </div>
           <div className="flex items-start gap-3">
             <Badge className="bg-yellow-500 mt-0.5">Weakening</Badge>
             <div>
-              <strong>Bottom-Right:</strong> RS-Ratio &gt; 100, RS-Momentum ≤ 0. Sectors still
+              <strong>Bottom-Right:</strong> RS-Ratio &gt; 100, RS-Momentum ≤ 100. Sectors still
               outperforming but losing momentum. <strong>Take profits</strong>
             </div>
           </div>
           <div className="flex items-start gap-3">
             <Badge className="bg-red-500 mt-0.5">Lagging</Badge>
             <div>
-              <strong>Bottom-Left:</strong> RS-Ratio ≤ 100, RS-Momentum ≤ 0. Sectors
+              <strong>Bottom-Left:</strong> RS-Ratio ≤ 100, RS-Momentum ≤ 100. Sectors
               underperforming with negative momentum. <strong>Avoid</strong>
             </div>
           </div>
           <div className="flex items-start gap-3">
             <Badge className="bg-blue-500 mt-0.5">Improving</Badge>
             <div>
-              <strong>Top-Left:</strong> RS-Ratio ≤ 100, RS-Momentum &gt; 0. Sectors still
+              <strong>Top-Left:</strong> RS-Ratio ≤ 100, RS-Momentum &gt; 100. Sectors still
               underperforming but gaining momentum. <strong>Watch/Early entry</strong>
             </div>
           </div>
           <div className="pt-2 border-t">
-            <strong>RS-Ratio:</strong> (Index/Benchmark) normalized to 100 baseline. Above 100 =
-            outperforming.
+            <strong>JdK RS-Ratio:</strong> 100 + Z-score((Index/Benchmark × 100) over 14-day rolling window).
+            Values hover around 100; above 100 = outperforming.
             <br />
-            <strong>RS-Momentum:</strong> Rate of change of RS-Ratio. Positive = gaining strength.
+            <strong>JdK RS-Momentum:</strong> 101 + Z-score(Rate-of-change of RS-Ratio over 14-day rolling window).
+            Values hover around 101; above 101 = gaining strength.
           </div>
         </CardContent>
       </Card>

@@ -146,13 +146,22 @@ export interface LeadingIndustry {
 }
 
 // RRG Charts
+export interface RRGPoint {
+  date: string;
+  rs_ratio: number;
+  rs_momentum: number;
+  quadrant: 'Leading' | 'Weakening' | 'Lagging' | 'Improving';
+}
+
 export interface RRGSector {
   index_symbol: string;
+  sector_category: string | null;
   rs_ratio: number;
   rs_momentum: number;
   quadrant: 'Leading' | 'Weakening' | 'Lagging' | 'Improving';
   weekly_change_percent: number;
   current_close: number;
+  historical_points: RRGPoint[];
 }
 
 export interface RRGChartsResponse {
@@ -160,7 +169,10 @@ export interface RRGChartsResponse {
   date: string;
   benchmark: string;
   benchmark_close: number;
-  lookback_days: number;
+  short_period: number;
+  long_period: number;
+  tail_length: number;
+  show_sectoral_only: boolean;
   count: number;
   quadrant_counts: {
     Leading: number;
