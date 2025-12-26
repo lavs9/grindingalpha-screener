@@ -395,6 +395,7 @@ async def get_weekly_movers(
         CalculatedMetrics.adr_percent,
         CalculatedMetrics.rvol,
         CalculatedMetrics.stage,
+        CalculatedMetrics.stage_detail,
         Security.security_name
     ).join(
         Security, Security.symbol == CalculatedMetrics.symbol
@@ -416,7 +417,8 @@ async def get_weekly_movers(
             "change_1d_percent": float(row.change_1d_percent) if row.change_1d_percent else None,
             "adr_percent": float(row.adr_percent) if row.adr_percent else None,
             "rvol": float(row.rvol) if row.rvol else None,
-            "stage": row.stage
+            "stage": row.stage,
+            "stage_detail": row.stage_detail if row.stage_detail else ""
         })
 
     return {
