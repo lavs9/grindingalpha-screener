@@ -59,18 +59,68 @@ This is an Indian stock market screener platform that aggregates data from NSE (
 
 ### Branch Naming Convention
 ```
-feature/{phase}-{description}  # For new features
+feature/{phase}-{description}  # For backend features
+frontend/{phase}-{description} # For frontend features (Phase 3+)
 bugfix/{issue-description}     # For bug fixes
 refactor/{component-name}      # For refactoring
 docs/{update-description}      # For documentation
 
 Examples:
+Backend (Phase 1-2):
 - feature/phase-1.6-data-quality-endpoints
 - feature/phase-2-rrg-screener
 - bugfix/ohlcv-duplicate-records
 - refactor/upstox-token-service
-- docs/update-api-documentation
+
+Frontend (Phase 3):
+- frontend/phase-3-initial-setup
+- frontend/phase-3-screener-tables
+- frontend/phase-3-rrg-charts
+- frontend/phase-3-dashboard-layout
 ```
+
+### Frontend Development Branch Strategy (Phase 3)
+
+**IMPORTANT: All frontend work MUST be done on `frontend/*` branches.**
+
+Frontend development follows a separate branch strategy to isolate UI changes from backend:
+
+1. **Base Branch:** All frontend branches start from `master`
+2. **Branch Prefix:** Use `frontend/phase-3-{feature-name}` format
+3. **Integration:** Frontend branches merge back to master only when feature is complete and tested
+4. **Isolation:** Frontend and backend can be developed in parallel without conflicts
+
+**Frontend Branch Workflow:**
+```bash
+# 1. Start new frontend feature
+git checkout master
+git pull origin master
+git checkout -b frontend/phase-3-screener-tables
+
+# 2. Work on frontend, commit regularly
+cd frontend
+pnpm dev  # Start dev server
+# Make changes...
+git add .
+git commit -m "feat: Implement screener data tables"
+
+# 3. Push to remote
+git push origin frontend/phase-3-screener-tables
+
+# 4. Create Pull Request on GitHub
+# 5. After testing & approval, merge to master
+# 6. Delete branch
+git checkout master
+git pull origin master
+git branch -d frontend/phase-3-screener-tables
+git push origin --delete frontend/phase-3-screener-tables
+```
+
+**Why Separate Frontend Branches:**
+- Backend APIs are stable (Phase 2 complete)
+- Frontend can iterate rapidly without affecting backend
+- Easy rollback if UI changes need revision
+- Clear separation in git history
 
 ### Development Workflow
 
@@ -558,24 +608,89 @@ All 11 planned screeners are documented in [documentation/screeners-idea.md](doc
 - **Token expiry:** Upstox tokens expire at 23:59 IST daily (not UTC, not midnight)
 - **Mapping confidence:** 100% = ISIN match, 90% = symbol-only match, lower = manual review needed
 
+## Frontend Development Guidelines (Phase 3)
+
+### Screenshot & Debugging Workflow
+
+**For sharing UI issues, console errors, or layout problems:**
+
+1. **Screenshot Method:** Save screenshots to `/tmp/` directory
+   ```bash
+   # Example: Take screenshot and save as
+   /tmp/screenshot.png
+   /tmp/console-error.png
+   /tmp/layout-issue.png
+   ```
+
+2. **Share with Claude:** Provide the path in conversation
+   ```
+   "Check /tmp/screenshot.png - the table columns are misaligned"
+   "See console error at /tmp/console-error.png"
+   ```
+
+3. **Chrome DevTools MCP:** Installed for automated debugging
+   - Claude can read console errors directly via MCP
+   - Network request inspection
+   - DOM element inspection
+   - Real-time error detection
+
+**Best Practices:**
+- Clear `/tmp/` old screenshots before new sessions
+- Use descriptive filenames (e.g., `/tmp/rrg-chart-rendering-issue.png`)
+- For complex issues, share multiple screenshots with context
+- Console errors are automatically captured via Chrome MCP when dev server is running
+
+### Frontend Tech Stack (Phase 3)
+
+**Framework & UI:**
+- **Next.js 14+** (App Router, Server Components)
+- **Shadcn/ui** (Mira preset, Zinc theme, JetBrains Mono font)
+- **TailwindCSS** (Utility-first styling)
+- **Lucide Icons** (Icon library)
+
+**Data & State:**
+- **TanStack Table v8** (Data tables with sorting, filtering, pagination)
+- **TanStack Query** (Server state management, caching)
+- **Zustand** (Client state management)
+
+**Charts:**
+- **TradingView Lightweight Charts** (OHLCV candlestick charts)
+- **Plotly.js** (RRG scatter plots, heatmaps)
+- **Recharts** (Simple bar/line charts for breadth metrics)
+
+**Authentication (Deferred):**
+- **Supabase Auth** (Email OTP, Google, GitHub OAuth)
+- Not implemented in initial setup - focus on screener functionality first
+
+**Package Manager:**
+- **pnpm** (Fast, efficient, strict dependencies)
+
+**Shadcn Configuration:**
+```json
+{
+  "preset": "base",
+  "style": "mira",
+  "baseColor": "zinc",
+  "theme": "zinc",
+  "iconLibrary": "lucide",
+  "font": "jetbrains-mono",
+  "menuAccent": "subtle",
+  "menuColor": "default",
+  "radius": "small",
+  "template": "next"
+}
+```
+
 ## Testing Approach
 
-**Current state:** No test framework set up
+**Backend (Phase 1-2):**
+- No test framework currently
+- Planned: pytest for unit tests, database fixtures
 
-**Planned (Phase 0):**
-- Unit tests with pytest
-- Sample files in `.claude/samples/` for parser testing
-- Database fixtures for integration tests
-
-**Example test pattern:**
-```python
-def test_equity_parser():
-    # Use sample file from .claude/samples/EQUITY_L_sample.csv
-    sample_path = ".claude/samples/EQUITY_L_sample.csv"
-    result = parse_equity_list(sample_path)
-    assert result["success"] == True
-    assert len(result["data"]) > 0
-```
+**Frontend (Phase 3):**
+- **Component Testing:** Vitest + React Testing Library
+- **E2E Testing:** Playwright (deferred to post-MVP)
+- **Visual Testing:** Manual via screenshot sharing to `/tmp/`
 
 ## Related Documentation
 
