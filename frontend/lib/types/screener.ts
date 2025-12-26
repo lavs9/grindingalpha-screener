@@ -93,7 +93,10 @@ export interface MomentumStock {
   name: string;
   rs_percentile: number;
   change_1d_percent: number;
-  lod_atr_percent: number;
+  lod_atr_percent: number | null;
+  atr_extension: number | null;
+  is_tight: boolean;
+  is_green_candle: boolean;
   stage: number;
   stage_detail: string;
 }
