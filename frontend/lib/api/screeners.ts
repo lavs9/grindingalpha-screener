@@ -56,7 +56,13 @@ export async function fetchMAStacked(params?: {
   minVcp?: number;
   limit?: number;
 }): Promise<ScreenerResponse<MAStackedStock>> {
-  const response = await apiClient.get('/screeners/ma-stacked', { params });
+  const response = await apiClient.get('/screeners/ma-stacked', {
+    params: {
+      target_date: params?.targetDate,
+      min_vcp: params?.minVcp,
+      limit: params?.limit,
+    }
+  });
   return response.data;
 }
 
