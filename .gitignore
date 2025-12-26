@@ -80,3 +80,4 @@ Thumbs.db
 
 # Alembic
 alembic/versions/*.pyc
+screenshots/
