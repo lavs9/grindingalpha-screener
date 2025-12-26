@@ -26,7 +26,14 @@ export async function fetch4PercentBreakouts(params?: {
   minRvol?: number;
   limit?: number;
 }): Promise<ScreenerResponse<Breakout4PercentStock>> {
-  const response = await apiClient.get('/screeners/breakouts-4percent', { params });
+  const response = await apiClient.get('/screeners/breakouts-4percent', {
+    params: {
+      target_date: params?.targetDate,
+      min_change: params?.minChange,
+      min_rvol: params?.minRvol,
+      limit: params?.limit,
+    }
+  });
   return response.data;
 }
 
@@ -36,7 +43,13 @@ export async function fetchRSLeaders(params?: {
   minRs?: number;
   limit?: number;
 }): Promise<ScreenerResponse<RSLeaderStock>> {
-  const response = await apiClient.get('/screeners/rs-leaders', { params });
+  const response = await apiClient.get('/screeners/rs-leaders', {
+    params: {
+      target_date: params?.targetDate,
+      min_rs: params?.minRs,
+      limit: params?.limit,
+    }
+  });
   return response.data;
 }
 
@@ -46,7 +59,13 @@ export async function fetchHighVolume(params?: {
   minRvol?: number;
   limit?: number;
 }): Promise<ScreenerResponse<HighVolumeStock>> {
-  const response = await apiClient.get('/screeners/high-volume', { params });
+  const response = await apiClient.get('/screeners/high-volume', {
+    params: {
+      target_date: params?.targetDate,
+      min_rvol: params?.minRvol,
+      limit: params?.limit,
+    }
+  });
   return response.data;
 }
 
@@ -73,7 +92,14 @@ export async function fetchWeeklyMovers(params?: {
   direction?: 'up' | 'down' | 'both';
   limit?: number;
 }): Promise<ScreenerResponse<WeeklyMoverStock>> {
-  const response = await apiClient.get('/screeners/weekly-movers', { params });
+  const response = await apiClient.get('/screeners/weekly-movers', {
+    params: {
+      target_date: params?.targetDate,
+      min_change: params?.minChange,
+      direction: params?.direction,
+      limit: params?.limit,
+    }
+  });
   return response.data;
 }
 
@@ -81,7 +107,11 @@ export async function fetchWeeklyMovers(params?: {
 export async function fetchStageAnalysis(params?: {
   targetDate?: string;
 }): Promise<StageAnalysisResponse> {
-  const response = await apiClient.get('/screeners/stage-analysis', { params });
+  const response = await apiClient.get('/screeners/stage-analysis', {
+    params: {
+      target_date: params?.targetDate,
+    }
+  });
   return response.data;
 }
 
@@ -92,7 +122,14 @@ export async function fetchMomentumWatchlist(params?: {
   maxLodAtr?: number;
   limit?: number;
 }): Promise<ScreenerResponse<MomentumStock>> {
-  const response = await apiClient.get('/screeners/momentum-watchlist', { params });
+  const response = await apiClient.get('/screeners/momentum-watchlist', {
+    params: {
+      target_date: params?.targetDate,
+      min_rs: params?.minRs,
+      max_lod_atr: params?.maxLodAtr,
+      limit: params?.limit,
+    }
+  });
   return response.data;
 }
 
@@ -100,7 +137,11 @@ export async function fetchMomentumWatchlist(params?: {
 export async function fetchBreadthMetrics(params?: {
   targetDate?: string;
 }): Promise<BreadthMetricsResponse> {
-  const response = await apiClient.get('/screeners/breadth-metrics', { params });
+  const response = await apiClient.get('/screeners/breadth-metrics', {
+    params: {
+      target_date: params?.targetDate,
+    }
+  });
   return response.data;
 }
 
@@ -110,7 +151,13 @@ export async function fetchLeadingIndustries(params?: {
   topN?: number;
   limit?: number;
 }): Promise<ScreenerResponse<LeadingIndustry>> {
-  const response = await apiClient.get('/screeners/leading-industries', { params });
+  const response = await apiClient.get('/screeners/leading-industries', {
+    params: {
+      target_date: params?.targetDate,
+      top_n: params?.topN,
+      limit: params?.limit,
+    }
+  });
   return response.data;
 }
 
@@ -122,6 +169,14 @@ export async function fetchRRGCharts(params?: {
   timeframe?: 'daily' | 'weekly' | 'monthly';
   tailLength?: number;
 }): Promise<RRGChartsResponse> {
-  const response = await apiClient.get('/screeners/rrg-charts', { params });
+  const response = await apiClient.get('/screeners/rrg-charts', {
+    params: {
+      target_date: params?.targetDate,
+      benchmark: params?.benchmark,
+      lookback_days: params?.lookbackDays,
+      timeframe: params?.timeframe,
+      tail_length: params?.tailLength,
+    }
+  });
   return response.data;
 }
