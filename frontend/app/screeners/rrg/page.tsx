@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fetchRRGCharts } from "@/lib/api/screeners";
 import type { RRGSector, RRGChartsResponse } from "@/lib/types/screener";
 
@@ -116,19 +117,46 @@ const createColumns = (
   },
 ];
 
+// Tail length options by timeframe based on RRG best practices
+const TAIL_LENGTH_OPTIONS = {
+  daily: [
+    { value: "5", label: "5 days" },
+    { value: "10", label: "10 days" },
+    { value: "15", label: "15 days (Default)" },
+    { value: "20", label: "20 days" },
+  ],
+  weekly: [
+    { value: "3", label: "3 weeks" },
+    { value: "8", label: "8 weeks" },
+    { value: "10", label: "10 weeks" },
+    { value: "12", label: "12 weeks (Default)" },
+  ],
+  monthly: [
+    { value: "3", label: "3 months" },
+    { value: "6", label: "6 months (Default)" },
+    { value: "9", label: "9 months" },
+    { value: "12", label: "12 months" },
+  ],
+};
+
 export default function RRGChartsPage() {
   const [data, setData] = React.useState<RRGChartsResponse | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [searchFilter, setSearchFilter] = React.useState<string>("");
   const [selectedIndices, setSelectedIndices] = React.useState<Set<string>>(new Set());
+  const [timeframe, setTimeframe] = React.useState<"daily" | "weekly" | "monthly">("daily");
+  const [tailLength, setTailLength] = React.useState<string>("15");
 
   React.useEffect(() => {
     async function loadData() {
       try {
         setLoading(true);
         setError(null);
-        const response = await fetchRRGCharts();
+        const response = await fetchRRGCharts({
+          timeframe,
+          tailLength: parseInt(tailLength),
+        });
         setData(response);
         // Initialize with all indices selected
         setSelectedIndices(new Set(response.results.map(s => s.index_symbol)));
@@ -141,7 +169,7 @@ export default function RRGChartsPage() {
     }
 
     loadData();
-  }, []);
+  }, [timeframe, tailLength]);
 
   // Filter data based on search input and selection
   const filteredResults = React.useMemo(() => {
@@ -196,6 +224,14 @@ export default function RRGChartsPage() {
 
   const deselectAll = () => {
     setSelectedIndices(new Set());
+  };
+
+  // Handle timeframe change - reset tail length to default for new timeframe
+  const handleTimeframeChange = (newTimeframe: "daily" | "weekly" | "monthly") => {
+    setTimeframe(newTimeframe);
+    // Set default tail length based on timeframe
+    const defaults = { daily: "15", weekly: "12", monthly: "6" };
+    setTailLength(defaults[newTimeframe]);
   };
 
   if (loading) {
@@ -261,6 +297,58 @@ export default function RRGChartsPage() {
           </CardHeader>
         </Card>
       </div>
+
+      {/* Timeframe and Tail Length Filters */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="text-lg">Chart Settings</CardTitle>
+          <CardDescription>
+            Customize the timeframe and tail length for the RRG chart
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap items-end gap-4">
+            {/* Timeframe Selector */}
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium">Timeframe</label>
+              <Select value={timeframe} onValueChange={handleTimeframeChange}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Select timeframe" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">Daily</SelectItem>
+                  <SelectItem value="weekly">Weekly</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Tail Length Selector */}
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium">Tail Length</label>
+              <Select value={tailLength} onValueChange={setTailLength}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Select tail length" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TAIL_LENGTH_OPTIONS[timeframe].map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Info text */}
+            <div className="text-sm text-muted-foreground">
+              {timeframe === "daily" && "Daily RRGs commonly use 15-day tails"}
+              {timeframe === "weekly" && "Weekly RRGs commonly use 12-week tails"}
+              {timeframe === "monthly" && "Monthly RRGs commonly use 6-month tails"}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Quadrant Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">

@@ -113,6 +113,8 @@ export async function fetchRRGCharts(params?: {
   targetDate?: string;
   benchmark?: string;
   lookbackDays?: number;
+  timeframe?: 'daily' | 'weekly' | 'monthly';
+  tailLength?: number;
 }): Promise<RRGChartsResponse> {
   const response = await apiClient.get('/screeners/rrg-charts', { params });
   return response.data;

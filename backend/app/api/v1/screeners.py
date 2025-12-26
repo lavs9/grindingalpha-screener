@@ -791,6 +791,56 @@ async def get_leading_industries(
     }
 
 
+def aggregate_to_weekly(daily_data: list) -> list:
+    """
+    Aggregate daily OHLCV data to weekly data.
+    Weekly close = last trading day's close in the week.
+    Returns list of (date, close) tuples for weekly data.
+    """
+    from datetime import timedelta
+    from collections import defaultdict
+
+    # Group by week (ISO week - Monday is start)
+    weekly_groups = defaultdict(list)
+    for row in daily_data:
+        # Get ISO week number
+        week_key = row.date.isocalendar()[:2]  # (year, week_number)
+        weekly_groups[week_key].append(row)
+
+    # For each week, take the last day's close
+    weekly_data = []
+    for week_key in sorted(weekly_groups.keys()):
+        week_rows = sorted(weekly_groups[week_key], key=lambda x: x.date)
+        last_row = week_rows[-1]  # Last trading day of the week
+        weekly_data.append(last_row)
+
+    return weekly_data
+
+
+def aggregate_to_monthly(daily_data: list) -> list:
+    """
+    Aggregate daily OHLCV data to monthly data.
+    Monthly close = last trading day's close in the month.
+    Returns list of (date, close) tuples for monthly data.
+    """
+    from collections import defaultdict
+
+    # Group by month
+    monthly_groups = defaultdict(list)
+    for row in daily_data:
+        month_key = (row.date.year, row.date.month)
+        monthly_groups[month_key].append(row)
+
+    # For each month, take the last day's close
+    monthly_data = []
+    for month_key in sorted(monthly_groups.keys()):
+        month_rows = sorted(monthly_groups[month_key], key=lambda x: x.date)
+        last_row = month_rows[-1]  # Last trading day of the month
+        monthly_data.append(last_row)
+
+    return monthly_data
+
+
 @router.get("/rrg-charts")
 async def get_rrg_charts(
     target_date: Optional[date] = Query(None, description="Date to analyze (default: latest available)"),
@@ -799,6 +849,7 @@ async def get_rrg_charts(
     long_period: int = Query(63, description="Long momentum period in trading days (default: 63 ~3 months)"),
     tail_length: int = Query(10, description="Number of historical points for RRG tails (default: 10, max: 60)"),
     show_sectoral_only: bool = Query(True, description="Show only sectoral/thematic indices (default: true)"),
+    timeframe: Optional[str] = Query("daily", description="Timeframe: daily, weekly, or monthly (default: daily)"),
     db: Session = Depends(get_db)
 ):
     """
@@ -828,10 +879,16 @@ async def get_rrg_charts(
     - long_period: Historical data periods (default: 63 days for sufficient data)
     - tail_length: Number of historical points for RRG tails (default: 10, max: 60)
     - show_sectoral_only: Show only sectoral/thematic indices (default: true)
+    - timeframe: Timeframe for candles - daily, weekly, or monthly (default: daily)
 
     **Returns:**
     RRG coordinates for all sectoral indices with values hovering around 100.
     """
+    # Validate timeframe parameter
+    valid_timeframes = ["daily", "weekly", "monthly"]
+    if timeframe not in valid_timeframes:
+        raise HTTPException(status_code=400, detail=f"Invalid timeframe. Must be one of: {', '.join(valid_timeframes)}")
+
     # Default to latest available date
     if target_date is None:
         latest = db.query(func.max(IndexOHLCVDaily.date)).scalar()
@@ -850,7 +907,17 @@ async def get_rrg_charts(
     # - Second rolling_window for RS-Momentum normalization (which needs ROC of RS-Ratio)
     # - Plus tail_length for the actual display
     total_periods_needed = tail_length + (2 * rolling_window)
-    benchmark_data = db.query(
+
+    # For weekly/monthly, we need more daily data to aggregate
+    # Weekly: ~5 trading days per week, Monthly: ~21 trading days per month
+    if timeframe == "weekly":
+        fetch_periods = total_periods_needed * 7  # Fetch ~7 days per week to be safe
+    elif timeframe == "monthly":
+        fetch_periods = total_periods_needed * 30  # Fetch ~30 days per month to be safe
+    else:  # daily
+        fetch_periods = total_periods_needed
+
+    benchmark_data_raw = db.query(
         IndexOHLCVDaily.date,
         IndexOHLCVDaily.close
     ).filter(
@@ -858,16 +925,27 @@ async def get_rrg_charts(
             IndexOHLCVDaily.symbol == benchmark,
             IndexOHLCVDaily.date <= target_date
         )
-    ).order_by(IndexOHLCVDaily.date.desc()).limit(total_periods_needed).all()
+    ).order_by(IndexOHLCVDaily.date.desc()).limit(fetch_periods).all()
+
+    if not benchmark_data_raw:
+        raise HTTPException(status_code=404, detail="No benchmark data available")
+
+    # Reverse to chronological order
+    benchmark_data_raw = list(reversed(benchmark_data_raw))
+
+    # Apply timeframe aggregation
+    if timeframe == "weekly":
+        benchmark_data = aggregate_to_weekly(benchmark_data_raw)
+    elif timeframe == "monthly":
+        benchmark_data = aggregate_to_monthly(benchmark_data_raw)
+    else:  # daily
+        benchmark_data = benchmark_data_raw
 
     if len(benchmark_data) < total_periods_needed:
         raise HTTPException(
             status_code=400,
-            detail=f"Insufficient historical data for benchmark. Need {total_periods_needed} days, found {len(benchmark_data)}"
+            detail=f"Insufficient historical data for benchmark. Need {total_periods_needed} {timeframe} periods, found {len(benchmark_data)}"
         )
-
-    # Reverse to chronological order
-    benchmark_data = list(reversed(benchmark_data))
 
     # Build benchmark price dict
     benchmark_prices = {row.date: float(row.close) for row in benchmark_data}
@@ -890,7 +968,7 @@ async def get_rrg_charts(
     sectors = []
     for (symbol,) in sectoral_indices:
         # Get historical data for this index
-        index_data = db.query(
+        index_data_raw = db.query(
             IndexOHLCVDaily.date,
             IndexOHLCVDaily.close,
             IndexOHLCVDaily.sector_category
@@ -899,13 +977,24 @@ async def get_rrg_charts(
                 IndexOHLCVDaily.symbol == symbol,
                 IndexOHLCVDaily.date <= target_date
             )
-        ).order_by(IndexOHLCVDaily.date.desc()).limit(total_periods_needed).all()
+        ).order_by(IndexOHLCVDaily.date.desc()).limit(fetch_periods).all()
 
-        if len(index_data) < total_periods_needed:
+        if not index_data_raw:
             continue
 
         # Reverse to chronological order
-        index_data = list(reversed(index_data))
+        index_data_raw = list(reversed(index_data_raw))
+
+        # Apply timeframe aggregation
+        if timeframe == "weekly":
+            index_data = aggregate_to_weekly(index_data_raw)
+        elif timeframe == "monthly":
+            index_data = aggregate_to_monthly(index_data_raw)
+        else:  # daily
+            index_data = index_data_raw
+
+        if len(index_data) < total_periods_needed:
+            continue
 
         # Build index price dict
         index_prices = {row.date: float(row.close) for row in index_data}
@@ -1062,6 +1151,7 @@ async def get_rrg_charts(
         "short_period": rolling_window,
         "long_period": total_periods_needed,
         "tail_length": tail_length,
+        "timeframe": timeframe,
         "show_sectoral_only": show_sectoral_only,
         "count": len(final_sectors),
         "quadrant_counts": {

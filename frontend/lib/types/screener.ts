@@ -172,6 +172,7 @@ export interface RRGChartsResponse {
   short_period: number;
   long_period: number;
   tail_length: number;
+  timeframe: 'daily' | 'weekly' | 'monthly';
   show_sectoral_only: boolean;
   count: number;
   quadrant_counts: {
