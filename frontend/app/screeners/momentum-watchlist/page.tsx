@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchMomentumWatchlist } from "@/lib/api/screeners";
 import type { MomentumStock, ScreenerResponse } from "@/lib/types/screener";
+import { formatMarketCap } from "@/lib/utils";
 
 // Column definitions for Momentum Watchlist table
 const columns: ColumnDef<MomentumStock>[] = [
@@ -110,6 +111,14 @@ const columns: ColumnDef<MomentumStock>[] = [
           )}
         </div>
       );
+    },
+  },
+  {
+    accessorKey: "market_cap",
+    header: ({ column }) => <SortableHeader column={column}>Market Cap</SortableHeader>,
+    cell: ({ row }) => {
+      const marketCap = row.getValue("market_cap") as number | null;
+      return <div className="font-mono text-sm">{formatMarketCap(marketCap)}</div>;
     },
   },
   {

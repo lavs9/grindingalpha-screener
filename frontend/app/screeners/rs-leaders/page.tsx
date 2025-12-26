@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchRSLeaders } from "@/lib/api/screeners";
 import type { RSLeaderStock } from "@/lib/types/screener";
+import { formatMarketCap } from "@/lib/utils";
 
 // Column definitions for RS Leaders table
 const columns: ColumnDef<RSLeaderStock>[] = [
@@ -86,6 +87,14 @@ const columns: ColumnDef<RSLeaderStock>[] = [
           {change.toFixed(2)}%
         </div>
       );
+    },
+  },
+  {
+    accessorKey: "market_cap",
+    header: ({ column }) => <SortableHeader column={column}>Market Cap</SortableHeader>,
+    cell: ({ row }) => {
+      const marketCap = row.getValue("market_cap") as number | null;
+      return <div className="font-mono text-sm">{formatMarketCap(marketCap)}</div>;
     },
   },
   {

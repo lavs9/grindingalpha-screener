@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchHighVolume } from "@/lib/api/screeners";
 import type { HighVolumeStock, ScreenerResponse } from "@/lib/types/screener";
+import { formatMarketCap } from "@/lib/utils";
 
 // Column definitions for High Volume table
 const columns: ColumnDef<HighVolumeStock>[] = [
@@ -86,6 +87,14 @@ const columns: ColumnDef<HighVolumeStock>[] = [
     cell: ({ row }) => {
       const close = row.getValue("close") as number;
       return <div className="font-mono">₹{close.toFixed(2)}</div>;
+    },
+  },
+  {
+    accessorKey: "market_cap",
+    header: ({ column }) => <SortableHeader column={column}>Market Cap</SortableHeader>,
+    cell: ({ row }) => {
+      const marketCap = row.getValue("market_cap") as number | null;
+      return <div className="font-mono text-sm">{formatMarketCap(marketCap)}</div>;
     },
   },
 ];

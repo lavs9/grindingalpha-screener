@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchWeeklyMovers } from "@/lib/api/screeners";
 import type { WeeklyMoverStock, ScreenerResponse } from "@/lib/types/screener";
+import { formatMarketCap } from "@/lib/utils";
 
 // Column definitions for Weekly Movers table
 const columns: ColumnDef<WeeklyMoverStock>[] = [
@@ -93,6 +94,14 @@ const columns: ColumnDef<WeeklyMoverStock>[] = [
           {rvol.toFixed(2)}x
         </Badge>
       );
+    },
+  },
+  {
+    accessorKey: "market_cap",
+    header: ({ column }) => <SortableHeader column={column}>Market Cap</SortableHeader>,
+    cell: ({ row }) => {
+      const marketCap = row.getValue("market_cap") as number | null;
+      return <div className="font-mono text-sm">{formatMarketCap(marketCap)}</div>;
     },
   },
   {

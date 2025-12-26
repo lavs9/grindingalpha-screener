@@ -240,13 +240,19 @@ async def get_high_volume_movers(
         CalculatedMetrics.change_1d_percent,
         Security.security_name,
         OHLCVDaily.volume,
-        OHLCVDaily.close
+        OHLCVDaily.close,
+        MarketCapHistory.market_cap
     ).join(
         Security, Security.symbol == CalculatedMetrics.symbol
     ).join(
         OHLCVDaily, and_(
             OHLCVDaily.symbol == CalculatedMetrics.symbol,
             OHLCVDaily.date == target_date
+        )
+    ).outerjoin(
+        MarketCapHistory, and_(
+            MarketCapHistory.symbol == CalculatedMetrics.symbol,
+            MarketCapHistory.date == target_date
         )
     ).filter(
         and_(
@@ -265,7 +271,8 @@ async def get_high_volume_movers(
             "volume": int(row.volume) if row.volume else 0,
             "rvol": float(row.rvol) if row.rvol else 0.0,
             "change_1d_percent": float(row.change_1d_percent) if row.change_1d_percent else 0.0,
-            "close": float(row.close) if row.close else 0.0
+            "close": float(row.close) if row.close else 0.0,
+            "market_cap": float(row.market_cap) if row.market_cap else None
         })
 
     return {
@@ -320,9 +327,15 @@ async def get_ma_stacked_breakouts(
         CalculatedMetrics.stage_detail,
         CalculatedMetrics.atr_extension_from_sma50,
         CalculatedMetrics.darvas_position_percent,
-        Security.security_name
+        Security.security_name,
+        MarketCapHistory.market_cap
     ).join(
         Security, Security.symbol == CalculatedMetrics.symbol
+    ).outerjoin(
+        MarketCapHistory, and_(
+            MarketCapHistory.symbol == CalculatedMetrics.symbol,
+            MarketCapHistory.date == target_date
+        )
     ).filter(
         and_(
             CalculatedMetrics.date == target_date,
@@ -344,7 +357,8 @@ async def get_ma_stacked_breakouts(
             "stage": row.stage,
             "stage_detail": row.stage_detail,
             "atr_extension": float(row.atr_extension_from_sma50) if row.atr_extension_from_sma50 else None,
-            "darvas_position": float(row.darvas_position_percent) if row.darvas_position_percent else None
+            "darvas_position": float(row.darvas_position_percent) if row.darvas_position_percent else None,
+            "market_cap": float(row.market_cap) if row.market_cap else None
         })
 
     return {
@@ -410,9 +424,15 @@ async def get_weekly_movers(
         CalculatedMetrics.rvol,
         CalculatedMetrics.stage,
         CalculatedMetrics.stage_detail,
-        Security.security_name
+        Security.security_name,
+        MarketCapHistory.market_cap
     ).join(
         Security, Security.symbol == CalculatedMetrics.symbol
+    ).outerjoin(
+        MarketCapHistory, and_(
+            MarketCapHistory.symbol == CalculatedMetrics.symbol,
+            MarketCapHistory.date == target_date
+        )
     ).filter(
         and_(
             CalculatedMetrics.date == target_date,
@@ -432,7 +452,8 @@ async def get_weekly_movers(
             "adr_percent": float(row.adr_percent) if row.adr_percent else None,
             "rvol": float(row.rvol) if row.rvol else None,
             "stage": row.stage,
-            "stage_detail": row.stage_detail if row.stage_detail else ""
+            "stage_detail": row.stage_detail if row.stage_detail else "",
+            "market_cap": float(row.market_cap) if row.market_cap else None
         })
 
     return {
@@ -565,9 +586,15 @@ async def get_momentum_watchlist(
         CalculatedMetrics.is_lod_tight,
         CalculatedMetrics.is_green_candle,
         CalculatedMetrics.change_1d_percent,
-        Security.security_name
+        Security.security_name,
+        MarketCapHistory.market_cap
     ).join(
         Security, Security.symbol == CalculatedMetrics.symbol
+    ).outerjoin(
+        MarketCapHistory, and_(
+            MarketCapHistory.symbol == CalculatedMetrics.symbol,
+            MarketCapHistory.date == target_date
+        )
     ).filter(
         and_(
             CalculatedMetrics.date == target_date,
@@ -591,7 +618,8 @@ async def get_momentum_watchlist(
             "lod_atr_percent": float(row.lod_atr_percent) if row.lod_atr_percent else None,
             "is_tight": bool(row.is_lod_tight),
             "is_green_candle": bool(row.is_green_candle),
-            "change_1d_percent": float(row.change_1d_percent) if row.change_1d_percent else None
+            "change_1d_percent": float(row.change_1d_percent) if row.change_1d_percent else None,
+            "market_cap": float(row.market_cap) if row.market_cap else None
         })
 
     return {
@@ -775,11 +803,17 @@ async def get_leading_industries(
         top_performers = db.query(
             CalculatedMetrics.symbol,
             CalculatedMetrics.change_1m_percent,
-            Security.security_name
+            Security.security_name,
+            MarketCapHistory.market_cap
         ).join(
             IndustryClassification, IndustryClassification.symbol == CalculatedMetrics.symbol
         ).join(
             Security, Security.symbol == CalculatedMetrics.symbol
+        ).outerjoin(
+            MarketCapHistory, and_(
+                MarketCapHistory.symbol == CalculatedMetrics.symbol,
+                MarketCapHistory.date == target_date
+            )
         ).filter(
             and_(
                 CalculatedMetrics.date == target_date,
@@ -801,7 +835,8 @@ async def get_leading_industries(
                 {
                     "symbol": p.symbol,
                     "name": p.security_name,
-                    "change_1m_percent": float(p.change_1m_percent) if p.change_1m_percent else None
+                    "change_1m_percent": float(p.change_1m_percent) if p.change_1m_percent else None,
+                    "market_cap": float(p.market_cap) if p.market_cap else None
                 }
                 for p in top_performers
             ]

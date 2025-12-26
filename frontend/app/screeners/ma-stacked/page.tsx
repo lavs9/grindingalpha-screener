@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchMAStacked } from "@/lib/api/screeners";
 import type { MAStackedStock, ScreenerResponse } from "@/lib/types/screener";
+import { formatMarketCap } from "@/lib/utils";
 
 // Column definitions for MA Stacked table
 const columns: ColumnDef<MAStackedStock>[] = [
@@ -84,6 +85,14 @@ const columns: ColumnDef<MAStackedStock>[] = [
           {darvas.toFixed(1)}%
         </div>
       );
+    },
+  },
+  {
+    accessorKey: "market_cap",
+    header: ({ column }) => <SortableHeader column={column}>Market Cap</SortableHeader>,
+    cell: ({ row }) => {
+      const marketCap = row.getValue("market_cap") as number | null;
+      return <div className="font-mono text-sm">{formatMarketCap(marketCap)}</div>;
     },
   },
   {

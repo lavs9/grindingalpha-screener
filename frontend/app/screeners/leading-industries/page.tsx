@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchLeadingIndustries } from "@/lib/api/screeners";
 import type { LeadingIndustry, ScreenerResponse } from "@/lib/types/screener";
+import { formatMarketCap } from "@/lib/utils";
 
 // Column definitions for Leading Industries table
 const columns: ColumnDef<LeadingIndustry>[] = [
@@ -298,6 +299,9 @@ export default function LeadingIndustriesPage() {
                     <div className={`text-lg font-bold mt-1 ${perf.change_1m_percent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       {perf.change_1m_percent >= 0 ? '+' : ''}
                       {perf.change_1m_percent.toFixed(2)}%
+                    </div>
+                    <div className="text-xs font-mono text-muted-foreground mt-1">
+                      {formatMarketCap(perf.market_cap)}
                     </div>
                   </div>
                 ))}

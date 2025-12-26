@@ -22,6 +22,7 @@ export interface Breakout4PercentStock {
   close: number;
   stage: number;
   stage_detail: string;
+  market_cap: number | null;
 }
 
 // RS Leaders (97 Club)
@@ -34,6 +35,7 @@ export interface RSLeaderStock {
   change_1w_percent: number;
   stage: number;
   stage_detail: string;
+  market_cap: number | null;
 }
 
 // High Volume Movers
@@ -44,6 +46,7 @@ export interface HighVolumeStock {
   rvol: number;
   change_1d_percent: number;
   close: number;
+  market_cap: number | null;
 }
 
 // MA Stacked Breakouts
@@ -56,6 +59,7 @@ export interface MAStackedStock {
   stage_detail: string;
   atr_extension: number;
   darvas_position: number;
+  market_cap: number | null;
 }
 
 // Weekly Movers
@@ -68,6 +72,7 @@ export interface WeeklyMoverStock {
   rvol: number;
   stage: number;
   stage_detail: string;
+  market_cap: number | null;
 }
 
 // Stage Analysis
@@ -99,6 +104,7 @@ export interface MomentumStock {
   is_green_candle: boolean;
   stage: number;
   stage_detail: string;
+  market_cap: number | null;
 }
 
 // Breadth Metrics
@@ -135,6 +141,7 @@ export interface TopPerformer {
   symbol: string;
   name: string;
   change_1m_percent: number;
+  market_cap: number | null;
 }
 
 export interface LeadingIndustry {
