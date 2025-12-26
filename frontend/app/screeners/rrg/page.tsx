@@ -15,7 +15,26 @@ import { fetchRRGCharts } from "@/lib/api/screeners";
 import type { RRGSector, RRGChartsResponse } from "@/lib/types/screener";
 
 // Column definitions for sector details table
-const columns: ColumnDef<RRGSector>[] = [
+// Note: We'll add the checkbox column dynamically in the component
+const createColumns = (
+  selectedIndices: Set<string>,
+  toggleIndex: (symbol: string) => void
+): ColumnDef<RRGSector>[] => [
+  {
+    id: "select",
+    header: () => <div className="w-10"></div>,
+    cell: ({ row }) => {
+      const symbol = row.getValue("index_symbol") as string;
+      return (
+        <input
+          type="checkbox"
+          checked={selectedIndices.has(symbol)}
+          onChange={() => toggleIndex(symbol)}
+          className="cursor-pointer w-4 h-4"
+        />
+      );
+    },
+  },
   {
     accessorKey: "index_symbol",
     header: ({ column }) => <SortableHeader column={column}>Index</SortableHeader>,
@@ -102,6 +121,7 @@ export default function RRGChartsPage() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [searchFilter, setSearchFilter] = React.useState<string>("");
+  const [selectedIndices, setSelectedIndices] = React.useState<Set<string>>(new Set());
 
   React.useEffect(() => {
     async function loadData() {
@@ -110,6 +130,8 @@ export default function RRGChartsPage() {
         setError(null);
         const response = await fetchRRGCharts();
         setData(response);
+        // Initialize with all indices selected
+        setSelectedIndices(new Set(response.results.map(s => s.index_symbol)));
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load data");
         console.error("Error loading RRG Charts:", err);
@@ -121,8 +143,28 @@ export default function RRGChartsPage() {
     loadData();
   }, []);
 
-  // Filter data based on search input
+  // Filter data based on search input and selection
   const filteredResults = React.useMemo(() => {
+    if (!data?.results) return [];
+
+    let results = data.results;
+
+    // Apply search filter
+    if (searchFilter) {
+      const lowerFilter = searchFilter.toLowerCase();
+      results = results.filter((sector) =>
+        sector.index_symbol.toLowerCase().includes(lowerFilter)
+      );
+    }
+
+    // Apply selection filter (only show selected indices on chart)
+    results = results.filter((sector) => selectedIndices.has(sector.index_symbol));
+
+    return results;
+  }, [data?.results, searchFilter, selectedIndices]);
+
+  // Get all indices that match search filter (for table display)
+  const searchFilteredResults = React.useMemo(() => {
     if (!data?.results) return [];
     if (!searchFilter) return data.results;
 
@@ -131,6 +173,30 @@ export default function RRGChartsPage() {
       sector.index_symbol.toLowerCase().includes(lowerFilter)
     );
   }, [data?.results, searchFilter]);
+
+  // Toggle individual index selection
+  const toggleIndex = (indexSymbol: string) => {
+    setSelectedIndices(prev => {
+      const next = new Set(prev);
+      if (next.has(indexSymbol)) {
+        next.delete(indexSymbol);
+      } else {
+        next.add(indexSymbol);
+      }
+      return next;
+    });
+  };
+
+  // Select/deselect all
+  const selectAll = () => {
+    if (data?.results) {
+      setSelectedIndices(new Set(data.results.map(s => s.index_symbol)));
+    }
+  };
+
+  const deselectAll = () => {
+    setSelectedIndices(new Set());
+  };
 
   if (loading) {
     return (
@@ -230,7 +296,7 @@ export default function RRGChartsPage() {
           <CardTitle>RRG Scatter Plot</CardTitle>
           <CardDescription>
             Sectors in the top-right (Leading) quadrant are outperforming with positive momentum.
-            {searchFilter && ` Showing ${filteredResults.length} of ${data.count} filtered indices.`}
+            {` Displaying ${filteredResults.length} of ${selectedIndices.size} selected indices.`}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -243,24 +309,32 @@ export default function RRGChartsPage() {
         <CardHeader>
           <CardTitle>Sector Details</CardTitle>
           <CardDescription>
-            Complete list of all sectoral indices with RRG metrics
+            Select indices to display on the chart. {selectedIndices.size} of {data.count} selected.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {/* Search Input */}
-            <div className="flex items-center">
+            {/* Search and Selection Controls */}
+            <div className="flex items-center justify-between gap-4">
               <Input
                 placeholder="Search index..."
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
                 className="max-w-sm"
               />
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={selectAll}>
+                  Select All
+                </Button>
+                <Button variant="outline" size="sm" onClick={deselectAll}>
+                  Deselect All
+                </Button>
+              </div>
             </div>
-            {/* Table with filtered data */}
+            {/* Table with checkboxes */}
             <DataTable
-              columns={columns}
-              data={filteredResults}
+              columns={createColumns(selectedIndices, toggleIndex)}
+              data={searchFilteredResults}
             />
           </div>
         </CardContent>
