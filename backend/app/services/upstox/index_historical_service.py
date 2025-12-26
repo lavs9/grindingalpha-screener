@@ -4,6 +4,7 @@ Index Historical OHLCV Data Service.
 Handles ingestion of historical daily candle data for NSE indices from Upstox API.
 """
 import time
+import requests
 from datetime import date, timedelta
 from typing import List, Dict, Optional
 from sqlalchemy.orm import Session
@@ -12,7 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from app.models.timeseries import IndexOHLCVDaily
 from app.models.upstox import UpstoxInstrument
 from app.services.upstox.token_manager import UpstoxTokenManager
-from app.services.upstox.api_client import UpstoxAPIClient
+from app.services.upstox.upstox_client import UpstoxClient
 
 
 class IndexHistoricalService:
@@ -21,7 +22,8 @@ class IndexHistoricalService:
     def __init__(self, db: Session):
         self.db = db
         self.token_manager = UpstoxTokenManager(db)
-        self.api_client = None
+        self.upstox_client = UpstoxClient(db)
+        self.base_url = "https://api.upstox.com/v2"
 
     def ingest_historical_ohlcv_batch(
         self,
@@ -63,7 +65,7 @@ class IndexHistoricalService:
                 "execution_time_ms": 0
             }
 
-        self.api_client = UpstoxAPIClient(token)
+        # Token is managed by upstox_client
 
         # Get list of indices
         if index_symbols:
@@ -146,21 +148,31 @@ class IndexHistoricalService:
     ) -> Dict:
         """Fetch historical candles for one index and insert into database."""
         # Fetch from Upstox API
-        candles = self.api_client.get_historical_candle_data(
-            instrument_key=instrument_key,
-            interval='day',
-            from_date=start_date,
-            to_date=end_date
-        )
+        headers = self.upstox_client.get_headers()
+        if not headers:
+            return {"inserted": 0, "updated": 0}
 
-        if not candles or 'data' not in candles or 'candles' not in candles['data']:
+        # API endpoint: /historical-candle/{instrument_key}/{interval}/{to_date}/{from_date}
+        url = f"{self.base_url}/historical-candle/{instrument_key}/day/{end_date.isoformat()}/{start_date.isoformat()}"
+
+        try:
+            response = requests.get(url, headers=headers, timeout=60)
+            response.raise_for_status()
+            data = response.json()
+
+            if data.get("status") != "success" or 'data' not in data or 'candles' not in data['data']:
+                return {"inserted": 0, "updated": 0}
+
+            candles = data['data']['candles']
+        except Exception as e:
+            print(f"Error fetching candles for {symbol}: {e}")
             return {"inserted": 0, "updated": 0}
 
         # Parse and insert candles
         inserted = 0
         updated = 0
 
-        for candle in candles['data']['candles']:
+        for candle in candles:
             try:
                 # Candle format: [timestamp, open, high, low, close, volume, oi]
                 candle_date = date.fromisoformat(candle[0].split('T')[0])
