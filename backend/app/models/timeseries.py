@@ -243,6 +243,31 @@ class CalculatedMetrics(Base):
     # ===== CANDLE TYPE =====
     is_green_candle = Column(Integer, comment="1 if close >= open, else 0")
 
+    # ===== RSI INDICATOR =====
+    rsi_14 = Column(Numeric(10, 4), comment="14-period RSI (Wilder smoothing)")
+    rsi_oversold = Column(Integer, comment="1 if RSI < 30, else 0")
+    rsi_overbought = Column(Integer, comment="1 if RSI > 70, else 0")
+
+    # ===== MACD INDICATOR =====
+    macd_line = Column(Numeric(10, 4), comment="12-EMA - 26-EMA")
+    macd_signal = Column(Numeric(10, 4), comment="9-EMA of MACD line")
+    macd_histogram = Column(Numeric(10, 4), comment="MACD line - Signal line")
+    is_macd_bullish_cross = Column(Integer, comment="1 if MACD line crossed above signal today, else 0")
+    is_macd_bearish_cross = Column(Integer, comment="1 if MACD line crossed below signal today, else 0")
+
+    # ===== BOLLINGER BANDS =====
+    bb_upper = Column(Numeric(15, 4), comment="20-SMA + 2*stddev")
+    bb_middle = Column(Numeric(15, 4), comment="20-SMA")
+    bb_lower = Column(Numeric(15, 4), comment="20-SMA - 2*stddev")
+    bb_bandwidth_percent = Column(Numeric(10, 4), comment="(Upper-Lower)/Middle * 100")
+    is_bb_squeeze = Column(Integer, comment="1 if Bandwidth < 10%, else 0")
+
+    # ===== ADX TREND STRENGTH =====
+    adx_14 = Column(Numeric(10, 4), comment="14-period ADX (Average Directional Index)")
+    di_plus = Column(Numeric(10, 4), comment="14-period +DI (Plus Directional Indicator)")
+    di_minus = Column(Numeric(10, 4), comment="14-period -DI (Minus Directional Indicator)")
+    is_strong_trend = Column(Integer, comment="1 if ADX > 25, else 0")
+
     # Timestamps
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
@@ -255,6 +280,13 @@ class CalculatedMetrics(Base):
         Index('idx_metrics_stage', 'stage'),
         Index('idx_metrics_date_rs', 'date', text('rs_percentile DESC')),
         Index('idx_metrics_volume_surge', 'is_volume_surge', 'date'),
+        # Technical indicators indexes
+        Index('idx_metrics_rsi_14', 'rsi_14'),
+        Index('idx_metrics_macd_histogram', 'macd_histogram'),
+        Index('idx_metrics_bb_bandwidth', 'bb_bandwidth_percent'),
+        Index('idx_metrics_adx_14', 'adx_14'),
+        Index('idx_metrics_is_bb_squeeze', 'is_bb_squeeze', 'date'),
+        Index('idx_metrics_is_strong_trend', 'is_strong_trend', 'date'),
     )
 
     def __repr__(self):

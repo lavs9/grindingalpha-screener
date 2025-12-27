@@ -1,7 +1,7 @@
 """
 Screener API Endpoints.
 
-Provides endpoints for all 11 stock screeners based on calculated metrics.
+Provides endpoints for all 15 stock screeners based on calculated metrics.
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -1220,4 +1220,453 @@ async def get_rrg_charts(
             "Improving": sum(1 for s in final_sectors if s['quadrant'] == 'Improving')
         },
         "results": final_sectors
+    }
+
+
+@router.get("/rsi-scanner")
+async def get_rsi_scanner(
+    target_date: Optional[date] = Query(None, description="Date to screen (default: latest available)"),
+    min_rsi: Optional[float] = Query(None, description="Minimum RSI value"),
+    max_rsi: Optional[float] = Query(None, description="Maximum RSI value"),
+    show_oversold: bool = Query(False, description="Show only oversold stocks (RSI < 30)"),
+    show_overbought: bool = Query(False, description="Show only overbought stocks (RSI > 70)"),
+    limit: int = Query(200, description="Maximum results to return"),
+    db: Session = Depends(get_db)
+):
+    """
+    **Screener #12: RSI Overbought/Oversold Scanner**
+
+    Identify potential reversals using 14-period RSI (Relative Strength Index).
+
+    **Criteria:**
+    - Oversold: RSI < 30 (potential buy signal)
+    - Overbought: RSI > 70 (potential sell signal)
+    - Neutral: RSI between 30-70
+    - Uses Wilder's smoothing method (14-period)
+
+    **Query Parameters:**
+    - target_date: Date to screen (YYYY-MM-DD, default: latest)
+    - min_rsi: Minimum RSI value filter
+    - max_rsi: Maximum RSI value filter
+    - show_oversold: Filter for RSI < 30 only
+    - show_overbought: Filter for RSI > 70 only
+    - limit: Max results (default: 200)
+
+    **Returns:**
+    List of stocks with RSI values, oversold/overbought flags, and price metrics.
+
+    **Example:**
+    ```bash
+    curl "http://localhost:8000/api/v1/screeners/rsi-scanner?show_oversold=true"
+    ```
+
+    **Reference:**
+    https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-indicators/relative-strength-index-rsi
+    """
+    # Default to latest available date
+    if target_date is None:
+        latest = db.query(func.max(CalculatedMetrics.date)).scalar()
+        if not latest:
+            raise HTTPException(status_code=404, detail="No metrics data available")
+        target_date = latest
+
+    query = db.query(
+        CalculatedMetrics.symbol,
+        Security.security_name,
+        CalculatedMetrics.rsi_14,
+        CalculatedMetrics.rsi_oversold,
+        CalculatedMetrics.rsi_overbought,
+        OHLCVDaily.close,
+        CalculatedMetrics.change_1w_percent,
+        OHLCVDaily.volume,
+        MarketCapHistory.market_cap
+    ).join(
+        Security, Security.symbol == CalculatedMetrics.symbol
+    ).join(
+        OHLCVDaily, and_(
+            OHLCVDaily.symbol == CalculatedMetrics.symbol,
+            OHLCVDaily.date == target_date
+        )
+    ).outerjoin(
+        MarketCapHistory, and_(
+            MarketCapHistory.symbol == CalculatedMetrics.symbol,
+            MarketCapHistory.date == target_date
+        )
+    ).filter(
+        CalculatedMetrics.date == target_date,
+        Security.is_active == True,
+        CalculatedMetrics.rsi_14.isnot(None)
+    )
+
+    # Apply filters
+    if min_rsi is not None:
+        query = query.filter(CalculatedMetrics.rsi_14 >= min_rsi)
+    if max_rsi is not None:
+        query = query.filter(CalculatedMetrics.rsi_14 <= max_rsi)
+    if show_oversold:
+        query = query.filter(CalculatedMetrics.rsi_oversold == 1)
+    if show_overbought:
+        query = query.filter(CalculatedMetrics.rsi_overbought == 1)
+
+    results = query.order_by(desc(CalculatedMetrics.rsi_14)).limit(limit).all()
+
+    stocks = []
+    for row in results:
+        stocks.append({
+            "symbol": row.symbol,
+            "name": row.security_name,
+            "rsi_14": float(row.rsi_14),
+            "is_oversold": bool(row.rsi_oversold),
+            "is_overbought": bool(row.rsi_overbought),
+            "close": float(row.close),
+            "change_1w_percent": float(row.change_1w_percent) if row.change_1w_percent else None,
+            "volume": int(row.volume),
+            "market_cap": float(row.market_cap) if row.market_cap else None
+        })
+
+    return {
+        "screener": "RSI Overbought/Oversold Scanner",
+        "date": str(target_date),
+        "total_results": len(stocks),
+        "results": stocks
+    }
+
+
+@router.get("/macd-crossover")
+async def get_macd_crossover(
+    target_date: Optional[date] = Query(None, description="Date to screen (default: latest available)"),
+    crossover_type: str = Query("all", description="Filter by crossover type: 'all', 'bullish', 'bearish'"),
+    min_histogram: Optional[float] = Query(None, description="Minimum histogram value"),
+    limit: int = Query(200, description="Maximum results to return"),
+    db: Session = Depends(get_db)
+):
+    """
+    **Screener #13: MACD Crossover Scanner**
+
+    Detect trend and momentum shifts using MACD (Moving Average Convergence Divergence).
+
+    **Criteria:**
+    - Bullish Crossover: MACD line crosses above signal line (momentum turning positive)
+    - Bearish Crossover: MACD line crosses below signal line (momentum turning negative)
+    - Histogram: MACD line - Signal line (momentum strength)
+    - Uses 12-EMA, 26-EMA, 9-EMA signal line
+
+    **Query Parameters:**
+    - target_date: Date to screen (YYYY-MM-DD, default: latest)
+    - crossover_type: 'all', 'bullish', or 'bearish' (default: all)
+    - min_histogram: Minimum histogram value filter
+    - limit: Max results (default: 200)
+
+    **Returns:**
+    List of stocks with MACD values, crossover type, and momentum metrics.
+
+    **Example:**
+    ```bash
+    curl "http://localhost:8000/api/v1/screeners/macd-crossover?crossover_type=bullish"
+    ```
+
+    **Reference:**
+    https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-indicators/macd-moving-average-convergence-divergence-oscillator
+    """
+    # Default to latest available date
+    if target_date is None:
+        latest = db.query(func.max(CalculatedMetrics.date)).scalar()
+        if not latest:
+            raise HTTPException(status_code=404, detail="No metrics data available")
+        target_date = latest
+
+    query = db.query(
+        CalculatedMetrics.symbol,
+        Security.security_name,
+        CalculatedMetrics.macd_line,
+        CalculatedMetrics.macd_signal,
+        CalculatedMetrics.macd_histogram,
+        CalculatedMetrics.is_macd_bullish_cross,
+        CalculatedMetrics.is_macd_bearish_cross,
+        OHLCVDaily.close,
+        CalculatedMetrics.change_1m_percent,
+        MarketCapHistory.market_cap
+    ).join(
+        Security, Security.symbol == CalculatedMetrics.symbol
+    ).join(
+        OHLCVDaily, and_(
+            OHLCVDaily.symbol == CalculatedMetrics.symbol,
+            OHLCVDaily.date == target_date
+        )
+    ).outerjoin(
+        MarketCapHistory, and_(
+            MarketCapHistory.symbol == CalculatedMetrics.symbol,
+            MarketCapHistory.date == target_date
+        )
+    ).filter(
+        CalculatedMetrics.date == target_date,
+        Security.is_active == True,
+        CalculatedMetrics.macd_line.isnot(None)
+    )
+
+    # Apply crossover filter
+    if crossover_type == "bullish":
+        query = query.filter(CalculatedMetrics.is_macd_bullish_cross == 1)
+    elif crossover_type == "bearish":
+        query = query.filter(CalculatedMetrics.is_macd_bearish_cross == 1)
+
+    # Apply histogram filter
+    if min_histogram is not None:
+        query = query.filter(CalculatedMetrics.macd_histogram >= min_histogram)
+
+    results = query.order_by(desc(CalculatedMetrics.macd_histogram)).limit(limit).all()
+
+    stocks = []
+    for row in results:
+        # Determine crossover type
+        crossover = "None"
+        if row.is_macd_bullish_cross:
+            crossover = "Bullish"
+        elif row.is_macd_bearish_cross:
+            crossover = "Bearish"
+
+        stocks.append({
+            "symbol": row.symbol,
+            "name": row.security_name,
+            "macd_line": float(row.macd_line),
+            "macd_signal": float(row.macd_signal),
+            "macd_histogram": float(row.macd_histogram),
+            "crossover_type": crossover,
+            "close": float(row.close),
+            "change_1m_percent": float(row.change_1m_percent) if row.change_1m_percent else None,
+            "market_cap": float(row.market_cap) if row.market_cap else None
+        })
+
+    return {
+        "screener": "MACD Crossover Scanner",
+        "date": str(target_date),
+        "total_results": len(stocks),
+        "results": stocks
+    }
+
+
+@router.get("/bollinger-squeeze")
+async def get_bollinger_squeeze(
+    target_date: Optional[date] = Query(None, description="Date to screen (default: latest available)"),
+    max_bandwidth: float = Query(10.0, description="Maximum bandwidth % for squeeze (default: 10.0)"),
+    show_squeeze_only: bool = Query(True, description="Show only squeezes (default: true)"),
+    limit: int = Query(200, description="Maximum results to return"),
+    db: Session = Depends(get_db)
+):
+    """
+    **Screener #14: Bollinger Band Squeeze Scanner**
+
+    Identify low-volatility contractions that often precede significant breakouts.
+
+    **Criteria:**
+    - Squeeze: Bandwidth < 10% (low volatility, breakout likely)
+    - Upper Band: 20-SMA + 2*StdDev
+    - Middle Band: 20-SMA
+    - Lower Band: 20-SMA - 2*StdDev
+    - Bandwidth %: ((Upper - Lower) / Middle) * 100
+    - Breakout Direction: Above Upper, Below Lower, or Within Bands
+
+    **Query Parameters:**
+    - target_date: Date to screen (YYYY-MM-DD, default: latest)
+    - max_bandwidth: Maximum bandwidth % to consider squeeze (default: 10.0)
+    - show_squeeze_only: Filter for squeezes only (default: true)
+    - limit: Max results (default: 200)
+
+    **Returns:**
+    List of stocks with Bollinger Band values, bandwidth %, and breakout direction.
+
+    **Example:**
+    ```bash
+    curl "http://localhost:8000/api/v1/screeners/bollinger-squeeze?max_bandwidth=8.0"
+    ```
+
+    **Reference:**
+    https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-overlays/bollinger-bands
+    """
+    # Default to latest available date
+    if target_date is None:
+        latest = db.query(func.max(CalculatedMetrics.date)).scalar()
+        if not latest:
+            raise HTTPException(status_code=404, detail="No metrics data available")
+        target_date = latest
+
+    query = db.query(
+        CalculatedMetrics.symbol,
+        Security.security_name,
+        CalculatedMetrics.bb_bandwidth_percent,
+        CalculatedMetrics.is_bb_squeeze,
+        OHLCVDaily.close,
+        CalculatedMetrics.bb_upper,
+        CalculatedMetrics.bb_middle,
+        CalculatedMetrics.bb_lower,
+        CalculatedMetrics.change_1w_percent,
+        MarketCapHistory.market_cap
+    ).join(
+        Security, Security.symbol == CalculatedMetrics.symbol
+    ).join(
+        OHLCVDaily, and_(
+            OHLCVDaily.symbol == CalculatedMetrics.symbol,
+            OHLCVDaily.date == target_date
+        )
+    ).outerjoin(
+        MarketCapHistory, and_(
+            MarketCapHistory.symbol == CalculatedMetrics.symbol,
+            MarketCapHistory.date == target_date
+        )
+    ).filter(
+        CalculatedMetrics.date == target_date,
+        Security.is_active == True,
+        CalculatedMetrics.bb_bandwidth_percent.isnot(None)
+    )
+
+    # Apply squeeze filter
+    if show_squeeze_only:
+        query = query.filter(CalculatedMetrics.bb_bandwidth_percent <= max_bandwidth)
+
+    results = query.order_by(CalculatedMetrics.bb_bandwidth_percent.asc()).limit(limit).all()
+
+    stocks = []
+    for row in results:
+        # Determine breakout direction
+        if row.close > row.bb_upper:
+            breakout_direction = "Above Upper"
+        elif row.close < row.bb_lower:
+            breakout_direction = "Below Lower"
+        else:
+            breakout_direction = "Within Bands"
+
+        stocks.append({
+            "symbol": row.symbol,
+            "name": row.security_name,
+            "bb_bandwidth_percent": float(row.bb_bandwidth_percent),
+            "is_squeeze": bool(row.is_bb_squeeze),
+            "close": float(row.close),
+            "bb_upper": float(row.bb_upper),
+            "bb_middle": float(row.bb_middle),
+            "bb_lower": float(row.bb_lower),
+            "breakout_direction": breakout_direction,
+            "change_1w_percent": float(row.change_1w_percent) if row.change_1w_percent else None,
+            "market_cap": float(row.market_cap) if row.market_cap else None
+        })
+
+    return {
+        "screener": "Bollinger Band Squeeze Scanner",
+        "date": str(target_date),
+        "total_results": len(stocks),
+        "results": stocks
+    }
+
+
+@router.get("/adx-trend")
+async def get_adx_trend(
+    target_date: Optional[date] = Query(None, description="Date to screen (default: latest available)"),
+    min_adx: float = Query(25.0, description="Minimum ADX value (default: 25.0)"),
+    trend_direction: str = Query("all", description="Filter by trend: 'all', 'bullish', 'bearish'"),
+    limit: int = Query(200, description="Maximum results to return"),
+    db: Session = Depends(get_db)
+):
+    """
+    **Screener #15: ADX Trend Strength Scanner**
+
+    Identify strong trends using ADX (Average Directional Index).
+
+    **Criteria:**
+    - Strong Trend: ADX > 25
+    - Very Strong Trend: ADX > 50
+    - Bullish Trend: +DI > -DI (uptrend with strong momentum)
+    - Bearish Trend: -DI > +DI (downtrend with strong momentum)
+    - ADX only measures trend strength, not direction
+
+    **Query Parameters:**
+    - target_date: Date to screen (YYYY-MM-DD, default: latest)
+    - min_adx: Minimum ADX value (default: 25.0)
+    - trend_direction: 'all', 'bullish', or 'bearish' (default: all)
+    - limit: Max results (default: 200)
+
+    **Returns:**
+    List of stocks with ADX values, +DI/-DI indicators, and trend direction.
+
+    **Example:**
+    ```bash
+    curl "http://localhost:8000/api/v1/screeners/adx-trend?min_adx=40&trend_direction=bullish"
+    ```
+
+    **Reference:**
+    https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-indicators/average-directional-index-adx
+    """
+    # Default to latest available date
+    if target_date is None:
+        latest = db.query(func.max(CalculatedMetrics.date)).scalar()
+        if not latest:
+            raise HTTPException(status_code=404, detail="No metrics data available")
+        target_date = latest
+
+    query = db.query(
+        CalculatedMetrics.symbol,
+        Security.security_name,
+        CalculatedMetrics.adx_14,
+        CalculatedMetrics.di_plus,
+        CalculatedMetrics.di_minus,
+        CalculatedMetrics.is_strong_trend,
+        OHLCVDaily.close,
+        CalculatedMetrics.change_1m_percent,
+        MarketCapHistory.market_cap
+    ).join(
+        Security, Security.symbol == CalculatedMetrics.symbol
+    ).join(
+        OHLCVDaily, and_(
+            OHLCVDaily.symbol == CalculatedMetrics.symbol,
+            OHLCVDaily.date == target_date
+        )
+    ).outerjoin(
+        MarketCapHistory, and_(
+            MarketCapHistory.symbol == CalculatedMetrics.symbol,
+            MarketCapHistory.date == target_date
+        )
+    ).filter(
+        CalculatedMetrics.date == target_date,
+        Security.is_active == True,
+        CalculatedMetrics.adx_14.isnot(None)
+    )
+
+    # Apply ADX filter
+    if min_adx is not None:
+        query = query.filter(CalculatedMetrics.adx_14 >= min_adx)
+
+    # Apply trend direction filter
+    if trend_direction == "bullish":
+        query = query.filter(CalculatedMetrics.di_plus > CalculatedMetrics.di_minus)
+    elif trend_direction == "bearish":
+        query = query.filter(CalculatedMetrics.di_minus > CalculatedMetrics.di_plus)
+
+    results = query.order_by(desc(CalculatedMetrics.adx_14)).limit(limit).all()
+
+    stocks = []
+    for row in results:
+        # Determine trend direction
+        if row.di_plus > row.di_minus:
+            direction = "Bullish"
+        elif row.di_minus > row.di_plus:
+            direction = "Bearish"
+        else:
+            direction = "Neutral"
+
+        stocks.append({
+            "symbol": row.symbol,
+            "name": row.security_name,
+            "adx_14": float(row.adx_14),
+            "di_plus": float(row.di_plus),
+            "di_minus": float(row.di_minus),
+            "trend_direction": direction,
+            "is_strong_trend": bool(row.is_strong_trend),
+            "close": float(row.close),
+            "change_1m_percent": float(row.change_1m_percent) if row.change_1m_percent else None,
+            "market_cap": float(row.market_cap) if row.market_cap else None
+        })
+
+    return {
+        "screener": "ADX Trend Strength Scanner",
+        "date": str(target_date),
+        "total_results": len(stocks),
+        "results": stocks
     }

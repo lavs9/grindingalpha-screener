@@ -193,3 +193,58 @@ export interface RRGChartsResponse {
   };
   results: RRGSector[];
 }
+
+// RSI Scanner
+export interface RSIStock {
+  symbol: string;
+  name: string;
+  rsi_14: number;
+  is_oversold: boolean;
+  is_overbought: boolean;
+  close: number;
+  change_1w_percent: number | null;
+  volume: number;
+  market_cap: number | null;
+}
+
+// MACD Crossover
+export interface MACDStock {
+  symbol: string;
+  name: string;
+  macd_line: number;
+  macd_signal: number;
+  macd_histogram: number;
+  crossover_type: string;  // "Bullish", "Bearish", "None"
+  close: number;
+  change_1m_percent: number | null;
+  market_cap: number | null;
+}
+
+// Bollinger Band Squeeze
+export interface BollingerStock {
+  symbol: string;
+  name: string;
+  bb_bandwidth_percent: number;
+  is_squeeze: boolean;
+  close: number;
+  bb_upper: number;
+  bb_middle: number;
+  bb_lower: number;
+  breakout_direction: string;  // "Above Upper", "Below Lower", "Within Bands"
+  change_1w_percent: number | null;
+  market_cap: number | null;
+}
+
+// ADX Trend Strength
+export interface ADXStock {
+  symbol: string;
+  name: string;
+  adx_14: number;
+  di_plus: number;
+  di_minus: number;
+  trend_direction: string;  // "Bullish", "Bearish", "Neutral"
+  is_strong_trend: boolean;
+  close: number;
+  change_1m_percent: number | null;
+  market_cap: number | null;
+}

@@ -17,6 +17,10 @@ import type {
   BreadthMetricsResponse,
   LeadingIndustry,
   RRGChartsResponse,
+  RSIStock,
+  MACDStock,
+  BollingerStock,
+  ADXStock,
 } from '../types/screener';
 
 // 1. 4% Daily Breakouts
@@ -174,6 +178,82 @@ export async function fetchRRGCharts(params?: {
       lookback_days: params?.lookbackDays,
       timeframe: params?.timeframe,
       tail_length: params?.tailLength,
+    }
+  });
+  return response.data;
+}
+
+// 11. RSI Scanner
+export async function fetchRSIScanner(params?: {
+  targetDate?: string;
+  minRsi?: number;
+  maxRsi?: number;
+  showOversold?: boolean;
+  showOverbought?: boolean;
+  limit?: number;
+}): Promise<ScreenerResponse<RSIStock>> {
+  const response = await apiClient.get('/screeners/rsi-scanner', {
+    params: {
+      target_date: params?.targetDate,
+      min_rsi: params?.minRsi,
+      max_rsi: params?.maxRsi,
+      show_oversold: params?.showOversold,
+      show_overbought: params?.showOverbought,
+      limit: params?.limit,
+    }
+  });
+  return response.data;
+}
+
+// 12. MACD Crossover
+export async function fetchMACDCrossover(params?: {
+  targetDate?: string;
+  crossoverType?: string;
+  minHistogram?: number;
+  limit?: number;
+}): Promise<ScreenerResponse<MACDStock>> {
+  const response = await apiClient.get('/screeners/macd-crossover', {
+    params: {
+      target_date: params?.targetDate,
+      crossover_type: params?.crossoverType,
+      min_histogram: params?.minHistogram,
+      limit: params?.limit,
+    }
+  });
+  return response.data;
+}
+
+// 13. Bollinger Band Squeeze
+export async function fetchBollingerSqueeze(params?: {
+  targetDate?: string;
+  maxBandwidth?: number;
+  showSqueezeOnly?: boolean;
+  limit?: number;
+}): Promise<ScreenerResponse<BollingerStock>> {
+  const response = await apiClient.get('/screeners/bollinger-squeeze', {
+    params: {
+      target_date: params?.targetDate,
+      max_bandwidth: params?.maxBandwidth,
+      show_squeeze_only: params?.showSqueezeOnly,
+      limit: params?.limit,
+    }
+  });
+  return response.data;
+}
+
+// 14. ADX Trend Strength
+export async function fetchADXTrend(params?: {
+  targetDate?: string;
+  minAdx?: number;
+  trendDirection?: string;
+  limit?: number;
+}): Promise<ScreenerResponse<ADXStock>> {
+  const response = await apiClient.get('/screeners/adx-trend', {
+    params: {
+      target_date: params?.targetDate,
+      min_adx: params?.minAdx,
+      trend_direction: params?.trendDirection,
+      limit: params?.limit,
     }
   });
   return response.data;
