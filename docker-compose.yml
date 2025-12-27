@@ -55,7 +55,7 @@ services:
 
   n8n:
     container_name: screener_n8n
-    image: n8nio/n8n:latest
+    image: n8nio/n8n:2.0.3
     environment:
       N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
       N8N_HOST: ${N8N_HOST:-localhost}
