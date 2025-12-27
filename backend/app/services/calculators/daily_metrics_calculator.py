@@ -737,8 +737,8 @@ class DailyMetricsCalculator:
 
         # Calculate 12-EMA and 26-EMA
         closes = df.loc[:idx, 'close']
-        ema_12 = closes.ewm(span=12, adjust=False).iloc[-1]
-        ema_26 = closes.ewm(span=26, adjust=False).iloc[-1]
+        ema_12 = closes.ewm(span=12, adjust=False).mean().iloc[-1]
+        ema_26 = closes.ewm(span=26, adjust=False).mean().iloc[-1]
 
         macd_line = ema_12 - ema_26
 
