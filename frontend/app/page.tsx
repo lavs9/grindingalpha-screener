@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, TrendingDown, Activity, BarChart3, Target, Layers, Zap, PieChart, Building2, GitCompare } from 'lucide-react';
+import { TrendingUp, TrendingDown, Activity, BarChart3, Target, Layers, Zap, PieChart, Building2, GitCompare, Gauge, GitMerge, Expand, Compass } from 'lucide-react';
 
 const screeners = [
   {
@@ -84,6 +84,38 @@ const screeners = [
     href: '/screeners/rrg',
     color: 'text-violet-600',
   },
+  {
+    id: 'rsi',
+    name: 'RSI Scanner',
+    description: 'Overbought/oversold using 14-period RSI',
+    icon: Gauge,
+    href: '/screeners/rsi-scanner',
+    color: 'text-red-600',
+  },
+  {
+    id: 'macd',
+    name: 'MACD Crossover',
+    description: 'Momentum shifts using MACD (12,26,9)',
+    icon: GitMerge,
+    href: '/screeners/macd-crossover',
+    color: 'text-teal-600',
+  },
+  {
+    id: 'bollinger',
+    name: 'Bollinger Squeeze',
+    description: 'Low volatility setups before breakouts',
+    icon: Expand,
+    href: '/screeners/bollinger-squeeze',
+    color: 'text-amber-600',
+  },
+  {
+    id: 'adx',
+    name: 'ADX Trend Strength',
+    description: 'Strong trending stocks using ADX (14)',
+    icon: Compass,
+    href: '/screeners/adx-trend',
+    color: 'text-sky-600',
+  },
 ];
 
 export default function HomePage() {
@@ -92,7 +124,7 @@ export default function HomePage() {
       <div className="mb-8">
         <h1 className="text-4xl font-bold mb-2">Grinding Alpha Screener</h1>
         <p className="text-muted-foreground text-lg">
-          Advanced Indian stock market screening with 10 momentum-based strategies
+          Advanced Indian stock market screening with 14 momentum-based strategies
         </p>
       </div>
 
@@ -127,7 +159,7 @@ export default function HomePage() {
       <div className="mt-12 p-6 border rounded-lg bg-muted/30">
         <h2 className="text-xl font-semibold mb-2">About This Dashboard</h2>
         <p className="text-muted-foreground mb-4">
-          This screener platform analyzes <strong>1,691 NSE securities</strong> and <strong>121 sectoral indices</strong> with 47 technical indicators including RS percentile, VARS, Stage Analysis, VCP patterns, and McClellan Oscillator.
+          This screener platform analyzes <strong>1,691 NSE securities</strong> and <strong>121 sectoral indices</strong> with 64 technical indicators including RS percentile, VARS, Stage Analysis, VCP patterns, McClellan Oscillator, RSI, MACD, Bollinger Bands, and ADX.
         </p>
         <p className="text-sm text-muted-foreground">
           Data updated daily • Backend: FastAPI + PostgreSQL • Frontend: Next.js + Shadcn/ui

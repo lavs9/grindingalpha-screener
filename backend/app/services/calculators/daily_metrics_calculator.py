@@ -757,12 +757,12 @@ class DailyMetricsCalculator:
         macd_values = []
         for i in range(max(26, idx - 9), idx + 1):
             c = df.loc[:i, 'close']
-            e12 = c.ewm(span=12, adjust=False).iloc[-1]
-            e26 = c.ewm(span=26, adjust=False).iloc[-1]
+            e12 = c.ewm(span=12, adjust=False).mean().iloc[-1]
+            e26 = c.ewm(span=26, adjust=False).mean().iloc[-1]
             macd_values.append(e12 - e26)
 
         macd_series = pd.Series(macd_values)
-        signal_line = macd_series.ewm(span=9, adjust=False).iloc[-1]
+        signal_line = macd_series.ewm(span=9, adjust=False).mean().iloc[-1]
         histogram = macd_line - signal_line
 
         # Detect crossovers (compare with previous day)
@@ -771,7 +771,7 @@ class DailyMetricsCalculator:
 
         if idx > 35:
             prev_macd = macd_values[-2] if len(macd_values) > 1 else macd_line
-            prev_signal_values = macd_series[:-1].ewm(span=9, adjust=False)
+            prev_signal_values = macd_series[:-1].ewm(span=9, adjust=False).mean()
             prev_signal = prev_signal_values.iloc[-1] if len(prev_signal_values) > 0 else signal_line
 
             # Bullish cross: MACD was below signal, now above

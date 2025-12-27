@@ -18,6 +18,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Menu,
+  Gauge,
+  GitMerge,
+  Expand,
+  Compass,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -100,6 +104,34 @@ const screenerLinks = [
     href: "/screeners/leading-industries",
     icon: Building2,
     description: "Sector leaders",
+  },
+  {
+    id: "rsi",
+    name: "RSI Scanner",
+    href: "/screeners/rsi-scanner",
+    icon: Gauge,
+    description: "Overbought/oversold",
+  },
+  {
+    id: "macd",
+    name: "MACD Crossover",
+    href: "/screeners/macd-crossover",
+    icon: GitMerge,
+    description: "Momentum shifts",
+  },
+  {
+    id: "bollinger",
+    name: "Bollinger Squeeze",
+    href: "/screeners/bollinger-squeeze",
+    icon: Expand,
+    description: "Volatility setups",
+  },
+  {
+    id: "adx",
+    name: "ADX Trend",
+    href: "/screeners/adx-trend",
+    icon: Compass,
+    description: "Trend strength",
   },
 ];
 
